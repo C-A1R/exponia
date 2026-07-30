@@ -2,8 +2,10 @@ APP_NAME := exponia-api
 BUILD_DIR := bin
 MAIN_PACKAGE := ./cmd/api
 ENV_FILE := ../.env
+MIGRATIONS_DIR := $(CURDIR)/migrations
+MIGRATE_IMAGE := migrate/migrate
 
-.PHONY: build run start test tidy clean
+.PHONY: build run start test tidy clean migrate-up migrate-down migrate-version
 
 build:
 	mkdir -p $(BUILD_DIR)
@@ -29,3 +31,39 @@ tidy:
 
 clean:
 	rm -rf $(BUILD_DIR)
+
+migrate-up:
+	set -a; \
+	. $(ENV_FILE); \
+	set +a; \
+	docker run --rm \
+		--network host \
+		-v $(MIGRATIONS_DIR):/migrations \
+		$(MIGRATE_IMAGE) \
+		-path=/migrations \
+		-database "$$DATABASE_URL" \
+		up
+
+migrate-down:
+	set -a; \
+	. $(ENV_FILE); \
+	set +a; \
+	docker run --rm \
+		--network host \
+		-v $(MIGRATIONS_DIR):/migrations \
+		$(MIGRATE_IMAGE) \
+		-path=/migrations \
+		-database "$$DATABASE_URL" \
+		down 1
+
+migrate-version:
+	set -a; \
+	. $(ENV_FILE); \
+	set +a; \
+	docker run --rm \
+		--network host \
+		-v $(MIGRATIONS_DIR):/migrations \
+		$(MIGRATE_IMAGE) \
+		-path=/migrations \
+		-database "$$DATABASE_URL" \
+		version
