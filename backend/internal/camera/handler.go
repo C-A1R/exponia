@@ -67,11 +67,27 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.logger.Info(
-		"camera created",
+		"camera created:",
 		slog.Int64("camera_id", camera.ID),
 		slog.String("manufacturer", camera.Manufacturer),
 		slog.String("model", camera.Model),
 	)
 
 	httpapi.WriteJSON(h.logger, w, http.StatusCreated, camera)
+}
+
+func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
+	cameras, err := h.repository.ListCameras(r.Context())
+	if err != nil {
+		h.logger.Error("failed to list cameras", slog.Any("error", err))
+		httpapi.WriteError(h.logger, w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	h.logger.Info(
+		"cameras listed:",
+		slog.Int("count", len(cameras)),
+	)
+
+	httpapi.WriteJSON(h.logger, w, http.StatusOK, cameras)
 }

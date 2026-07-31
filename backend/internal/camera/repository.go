@@ -54,3 +54,40 @@ func (r *Repository) CreateCamera(
 
 	return camera, nil
 }
+
+func (r *Repository) ListCameras(ctx context.Context) ([]Camera, error) {
+	const query = `
+		SELECT *
+		FROM cameras
+		ORDER BY created_at DESC
+	`
+
+	rows, err := r.db.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("select cameras: %w", err)
+	}
+	defer rows.Close()
+
+	cameras := make([]Camera, 0)
+
+	for rows.Next() {
+		var camera Camera
+
+		if err := rows.Scan(
+			&camera.ID,
+			&camera.Manufacturer,
+			&camera.Model,
+			&camera.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan camera: %w", err)
+		}
+
+		cameras = append(cameras, camera)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate cameras: %w", err)
+	}
+
+	return cameras, nil
+}

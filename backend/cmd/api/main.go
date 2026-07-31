@@ -52,6 +52,8 @@ func main() {
 	cameraHandler := camera.NewHandler(cameraRepository, appLogger)
 	mux.HandleFunc("POST /api/v1/cameras", cameraHandler.Create)
 
+	mux.HandleFunc("GET /api/v1/cameras", cameraHandler.List)
+
 	server := &http.Server{
 		Addr:              ":8080",
 		Handler:           mux,
