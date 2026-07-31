@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"github.com/C-A1R/exponia/backend/internal/database"
+	"github.com/C-A1R/exponia/backend/internal/httpapi"
 	"github.com/C-A1R/exponia/backend/internal/logger"
 
 	"github.com/C-A1R/exponia/backend/internal/camera"
@@ -105,17 +105,13 @@ func main() {
 
 func healthHandler(logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {
-		response := healthResponse{
-			Status: "ok",
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			logger.Error(
-				"failed to encode health response",
-				slog.Any("error", err),
-			)
-		}
+		httpapi.WriteJSON(
+			logger,
+			w,
+			http.StatusOK,
+			healthResponse{
+				Status: "ok",
+			},
+		)
 	}
 }

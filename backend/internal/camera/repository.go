@@ -9,7 +9,7 @@ import (
 )
 
 type Camera struct {
-	ID           int       `json:"id"`
+	ID           int64     `json:"id"`
 	Manufacturer string    `json:"manufacturer"`
 	Model        string    `json:"model"`
 	CreatedAt    time.Time `json:"created_at"`

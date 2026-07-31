@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+
+	"github.com/C-A1R/exponia/backend/internal/httpapi"
 )
 
 type Handler struct {
@@ -17,10 +19,6 @@ type createCameraRequest struct {
 	Model        string `json:"model"`
 }
 
-type errorResponse struct {
-	Error string `json:"error"`
-}
-
 func NewHandler(
 	repository *Repository,
 	logger *slog.Logger,
@@ -31,18 +29,6 @@ func NewHandler(
 	}
 }
 
-func (h *Handler) writeJSON(w http.ResponseWriter, status int, value any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-
-	if err := json.NewEncoder(w).Encode(value); err != nil {
-		h.logger.Error(
-			"failed to encode JSON response",
-			slog.Any("error", err),
-		)
-	}
-}
-
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	var request createCameraRequest
 
@@ -50,9 +36,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	decoder.DisallowUnknownFields()
 
 	if err := decoder.Decode(&request); err != nil {
-		h.writeJSON(w, http.StatusBadRequest, errorResponse{
-			Error: "invalid request body",
-		})
+		httpapi.WriteError(h.logger, w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
@@ -60,16 +44,12 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	request.Model = strings.TrimSpace(request.Model)
 
 	if request.Manufacturer == "" {
-		h.writeJSON(w, http.StatusBadRequest, errorResponse{
-			Error: "manufacturer is required",
-		})
+		httpapi.WriteError(h.logger, w, http.StatusBadRequest, "manufacturer is required")
 		return
 	}
 
 	if request.Model == "" {
-		h.writeJSON(w, http.StatusBadRequest, errorResponse{
-			Error: "model is required",
-		})
+		httpapi.WriteError(h.logger, w, http.StatusBadRequest, "model is required")
 		return
 	}
 
@@ -82,11 +62,16 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.logger.Error("failed to create camera", slog.Any("error", err))
 
-		h.writeJSON(w, http.StatusInternalServerError, errorResponse{
-			Error: "internal server error",
-		})
+		httpapi.WriteError(h.logger, w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
-	h.writeJSON(w, http.StatusCreated, camera)
+	h.logger.Info(
+		"camera created",
+		slog.Int64("camera_id", camera.ID),
+		slog.String("manufacturer", camera.Manufacturer),
+		slog.String("model", camera.Model),
+	)
+
+	httpapi.WriteJSON(h.logger, w, http.StatusCreated, camera)
 }
