@@ -32,6 +32,8 @@ func NewHandler(
 }
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+
 	var request createCameraRequest
 
 	decoder := json.NewDecoder(r.Body)
@@ -145,6 +147,8 @@ type updateCameraRequest struct {
 }
 
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+
 	idValue := r.PathValue("id")
 	id, err := strconv.ParseInt(idValue, 10, 64)
 	if err != nil || id <= 0 {
