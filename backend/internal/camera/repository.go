@@ -2,11 +2,15 @@ package camera
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+var ErrNotFound = errors.New("camera not found")
 
 type Camera struct {
 	ID           int64     `json:"id"`
@@ -90,4 +94,76 @@ func (r *Repository) ListCameras(ctx context.Context) ([]Camera, error) {
 	}
 
 	return cameras, nil
+}
+
+func (r *Repository) GetCameraById(ctx context.Context, id int64) (Camera, error) {
+	const query = `
+		SELECT *
+		FROM cameras
+		WHERE id = $1
+	`
+
+	var camera Camera
+
+	err := r.db.QueryRow(ctx, query, id).Scan(
+		&camera.ID,
+		&camera.Manufacturer,
+		&camera.Model,
+		&camera.CreatedAt,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Camera{}, ErrNotFound
+		}
+		return Camera{}, fmt.Errorf("select camera by id: %w", err)
+	}
+
+	return camera, nil
+}
+
+func (r *Repository) UpdateCamera(ctx context.Context, id int64, manufacturer string, model string) (Camera, error) {
+	const query = `
+		UPDATE cameras
+		SET manufacturer = $2,
+		    model = $3
+		WHERE id = $1
+		RETURNING id, manufacturer, model, created_at
+	`
+
+	var camera Camera
+
+	err := r.db.QueryRow(ctx, query, id, manufacturer, model).Scan(
+		&camera.ID,
+		&camera.Manufacturer,
+		&camera.Model,
+		&camera.CreatedAt,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Camera{}, ErrNotFound
+		}
+		return Camera{}, fmt.Errorf("update camera: %w", err)
+	}
+
+	return camera, nil
+}
+
+func (r *Repository) DeleteCamera(ctx context.Context, id int64) error {
+	const query = `
+		DELETE FROM cameras
+		WHERE id = $1
+	`
+
+	cmdTag, err := r.db.Exec(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("delete camera: %w", err)
+	}
+
+	if cmdTag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+
+	return nil
 }
