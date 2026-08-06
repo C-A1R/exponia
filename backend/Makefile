@@ -5,7 +5,7 @@ ENV_FILE := ../.env
 MIGRATIONS_DIR := $(CURDIR)/migrations
 MIGRATE_IMAGE := migrate/migrate
 
-.PHONY: build run start test tidy clean migrate-up migrate-down migrate-version
+.PHONY: build run start test tidy clean migrate-up migrate-down migrate-version sqlc
 
 build:
 	mkdir -p $(BUILD_DIR)
@@ -67,3 +67,6 @@ migrate-version:
 		-path=/migrations \
 		-database "$$DATABASE_URL" \
 		version
+
+sqlc:
+	sqlc generate
