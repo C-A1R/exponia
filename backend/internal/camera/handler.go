@@ -96,7 +96,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	httpapi.WriteJSON(h.logger, w, http.StatusOK, cameras)
 }
 
-func (h *Handler) GetById(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
 	idValue := r.PathValue("id")
 	id, err := strconv.ParseInt(idValue, 10, 64)
 	if err != nil || id <= 0 {

@@ -51,11 +51,7 @@ func main() {
 	cameraRepository := camera.NewRepository(db)
 	cameraService := camera.NewService(cameraRepository)
 	cameraHandler := camera.NewHandler(cameraService, appLogger)
-	mux.HandleFunc("POST /api/v1/cameras", cameraHandler.Create)
-	mux.HandleFunc("GET /api/v1/cameras", cameraHandler.List)
-	mux.HandleFunc("GET /api/v1/cameras/{id}", cameraHandler.GetById)
-	mux.HandleFunc("PUT /api/v1/cameras/{id}", cameraHandler.Update)
-	mux.HandleFunc("DELETE /api/v1/cameras/{id}", cameraHandler.Delete)
+	camera.RegisterRoutes(mux, cameraHandler)
 
 	server := &http.Server{
 		Addr:              ":8080",
