@@ -12,8 +12,8 @@ import (
 )
 
 type Handler struct {
-	repository *Repository
-	logger     *slog.Logger
+	service *Service
+	logger  *slog.Logger
 }
 
 type createCameraRequest struct {
@@ -22,12 +22,12 @@ type createCameraRequest struct {
 }
 
 func NewHandler(
-	repository *Repository,
+	service *Service,
 	logger *slog.Logger,
 ) *Handler {
 	return &Handler{
-		repository: repository,
-		logger:     logger,
+		service: service,
+		logger:  logger,
 	}
 }
 
@@ -57,7 +57,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	camera, err := h.repository.CreateCamera(
+	camera, err := h.service.CreateCamera(
 		r.Context(),
 		request.Manufacturer,
 		request.Model,
@@ -81,7 +81,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
-	cameras, err := h.repository.ListCameras(r.Context())
+	cameras, err := h.service.ListCameras(r.Context())
 	if err != nil {
 		h.logger.Error("failed to list cameras", slog.Any("error", err))
 		httpapi.WriteError(h.logger, w, http.StatusInternalServerError, "internal server error")
@@ -109,7 +109,7 @@ func (h *Handler) GetById(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	camera, err := h.repository.GetCameraById(r.Context(), id)
+	camera, err := h.service.GetCameraByID(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			httpapi.WriteError(
@@ -193,7 +193,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	camera, err := h.repository.UpdateCamera(
+	camera, err := h.service.UpdateCamera(
 		r.Context(),
 		id,
 		request.Manufacturer,
@@ -246,7 +246,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.repository.DeleteCamera(r.Context(), id)
+	err = h.service.DeleteCamera(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			httpapi.WriteError(

@@ -49,7 +49,8 @@ func main() {
 	mux.HandleFunc("GET /health", healthHandler(appLogger))
 
 	cameraRepository := camera.NewRepository(db)
-	cameraHandler := camera.NewHandler(cameraRepository, appLogger)
+	cameraService := camera.NewService(cameraRepository)
+	cameraHandler := camera.NewHandler(cameraService, appLogger)
 	mux.HandleFunc("POST /api/v1/cameras", cameraHandler.Create)
 	mux.HandleFunc("GET /api/v1/cameras", cameraHandler.List)
 	mux.HandleFunc("GET /api/v1/cameras/{id}", cameraHandler.GetById)

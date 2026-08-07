@@ -54,7 +54,7 @@ func (r *Repository) ListCameras(ctx context.Context) ([]Camera, error) {
 	return cameras, nil
 }
 
-func (r *Repository) GetCameraById(ctx context.Context, id int64) (Camera, error) {
+func (r *Repository) GetCameraByID(ctx context.Context, id int64) (Camera, error) {
 	camera, err := r.queries.GetCameraByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
