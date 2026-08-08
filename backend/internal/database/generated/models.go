@@ -14,3 +14,12 @@ type Camera struct {
 	Model        string             `json:"model"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 }
+
+type Lense struct {
+	ID            int64              `json:"id"`
+	Manufacturer  string             `json:"manufacturer"`
+	Model         string             `json:"model"`
+	FocalLengthMm int32              `json:"focal_length_mm"`
+	MaxAperture   float64            `json:"max_aperture"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+}
