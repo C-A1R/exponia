@@ -15,6 +15,32 @@ type Camera struct {
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 }
 
+type FilmColorType struct {
+	ID   int64  `json:"id"`
+	Code string `json:"code"`
+	Name string `json:"name"`
+}
+
+type FilmFormat struct {
+	ID   int64  `json:"id"`
+	Code string `json:"code"`
+	Name string `json:"name"`
+}
+
+type FilmStock struct {
+	ID           int64              `json:"id"`
+	Manufacturer string             `json:"manufacturer"`
+	Name         string             `json:"name"`
+	Iso          int32              `json:"iso"`
+	ColorTypeID  int64              `json:"color_type_id"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+}
+
+type FilmStockFormat struct {
+	FilmStockID int64 `json:"film_stock_id"`
+	FormatID    int64 `json:"format_id"`
+}
+
 type Lense struct {
 	ID            int64              `json:"id"`
 	Manufacturer  string             `json:"manufacturer"`

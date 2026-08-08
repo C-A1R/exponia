@@ -15,6 +15,7 @@ import (
 	"github.com/C-A1R/exponia/backend/internal/logger"
 
 	"github.com/C-A1R/exponia/backend/internal/camera"
+	"github.com/C-A1R/exponia/backend/internal/filmstock"
 	"github.com/C-A1R/exponia/backend/internal/lens"
 )
 
@@ -58,6 +59,11 @@ func main() {
 	lensService := lens.NewService(lensRepository)
 	lensHandler := lens.NewHandler(lensService, appLogger)
 	lens.RegisterRoutes(mux, lensHandler)
+
+	filmStockRepository := filmstock.NewRepository(db)
+	filmStockService := filmstock.NewService(filmStockRepository)
+	filmStockHandler := filmstock.NewHandler(filmStockService, appLogger)
+	filmstock.RegisterRoutes(mux, filmStockHandler)
 
 	server := &http.Server{
 		Addr:              ":8080",

@@ -5,7 +5,7 @@ ENV_FILE := ../.env
 MIGRATIONS_DIR := $(CURDIR)/migrations
 MIGRATE_IMAGE := migrate/migrate
 
-.PHONY: build run start test tidy clean migrate-up migrate-down migrate-version sqlc
+.PHONY: build run start test tidy clean migrate-up migrate-down migrate-version migrate-force sqlc
 
 build:
 	mkdir -p $(BUILD_DIR)
@@ -67,6 +67,18 @@ migrate-version:
 		-path=/migrations \
 		-database "$$DATABASE_URL" \
 		version
+
+migrate-force:
+	set -a; \
+	. $(ENV_FILE); \
+	set +a; \
+	docker run --rm \
+		--network host \
+		-v $(MIGRATIONS_DIR):/migrations \
+		$(MIGRATE_IMAGE) \
+		-path=/migrations \
+		-database "$$DATABASE_URL" \
+		force $(VER)
 
 sqlc:
 	sqlc generate
