@@ -15,6 +15,7 @@ import (
 	"github.com/C-A1R/exponia/backend/internal/logger"
 
 	"github.com/C-A1R/exponia/backend/internal/camera"
+	"github.com/C-A1R/exponia/backend/internal/lens"
 )
 
 type healthResponse struct {
@@ -52,6 +53,11 @@ func main() {
 	cameraService := camera.NewService(cameraRepository)
 	cameraHandler := camera.NewHandler(cameraService, appLogger)
 	camera.RegisterRoutes(mux, cameraHandler)
+
+	lensRepository := lens.NewRepository(db)
+	lensService := lens.NewService(lensRepository)
+	lensHandler := lens.NewHandler(lensService, appLogger)
+	lens.RegisterRoutes(mux, lensHandler)
 
 	server := &http.Server{
 		Addr:              ":8080",

@@ -56,7 +56,7 @@ func (r *Repository) Create(
 	return fromDBLens(value), nil
 }
 
-func (r *Repository) ListLenses(ctx context.Context) ([]Lens, error) {
+func (r *Repository) List(ctx context.Context) ([]Lens, error) {
 	values, err := r.queries.ListLenses(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list lenses: %w", err)
@@ -71,7 +71,7 @@ func (r *Repository) ListLenses(ctx context.Context) ([]Lens, error) {
 	return lenses, nil
 }
 
-func (r *Repository) GetLensByID(
+func (r *Repository) GetByID(
 	ctx context.Context,
 	id int64,
 ) (Lens, error) {
@@ -87,7 +87,7 @@ func (r *Repository) GetLensByID(
 	return fromDBLens(value), nil
 }
 
-func (r *Repository) UpdateLens(
+func (r *Repository) Update(
 	ctx context.Context,
 	id int64,
 	manufacturer string,
