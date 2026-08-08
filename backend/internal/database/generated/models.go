@@ -27,6 +27,16 @@ type FilmFormat struct {
 	Name string `json:"name"`
 }
 
+type FilmRoll struct {
+	ID          int64              `json:"id"`
+	FilmStockID int64              `json:"film_stock_id"`
+	FormatID    int64              `json:"format_id"`
+	CameraID    pgtype.Int8        `json:"camera_id"`
+	ExposureIso int32              `json:"exposure_iso"`
+	Status      string             `json:"status"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+}
+
 type FilmStock struct {
 	ID           int64              `json:"id"`
 	Manufacturer string             `json:"manufacturer"`

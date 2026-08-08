@@ -24,7 +24,7 @@ start: build
 	./$(BUILD_DIR)/$(APP_NAME)
 
 test:
-	go test ./...
+	gotestsum --format testname -- ./... -count=1
 
 tidy:
 	go mod tidy
