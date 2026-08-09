@@ -59,3 +59,12 @@ type Lense struct {
 	MaxAperture   float64            `json:"max_aperture"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 }
+
+type User struct {
+	ID          int64              `json:"id"`
+	Email       string             `json:"email"`
+	DisplayName string             `json:"display_name"`
+	AuthIssuer  string             `json:"auth_issuer"`
+	AuthSubject string             `json:"auth_subject"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+}
