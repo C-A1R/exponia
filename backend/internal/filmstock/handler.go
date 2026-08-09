@@ -38,6 +38,11 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.logger.Info(
+		"film stocks listed",
+		slog.Int("count", len(stocks)),
+	)
+
 	httpapi.WriteJSON(
 		h.logger,
 		w,
@@ -85,6 +90,14 @@ func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
+
+	h.logger.Info(
+		"film stock retrieved",
+		slog.Int64("film_stock_id", stock.ID),
+		slog.String("manufacturer", stock.Manufacturer),
+		slog.String("name", stock.Name),
+		slog.Int("iso", int(stock.ISO)),
+	)
 
 	httpapi.WriteJSON(
 		h.logger,

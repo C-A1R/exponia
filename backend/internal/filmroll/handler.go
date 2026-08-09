@@ -46,10 +46,18 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		req.FormatID,
 	)
 	if err != nil {
-		h.logger.Error("create film roll", "error", err)
+		h.logger.Error("failed to create film roll", slog.Any("error", err))
 		httpapi.WriteError(h.logger, w, http.StatusInternalServerError, "internal server error")
 		return
 	}
+
+	h.logger.Info(
+		"film roll created",
+		slog.Int64("film_roll_id", roll.ID),
+		slog.Int64("film_stock_id", roll.FilmStock.ID),
+		slog.Int64("format_id", roll.Format.ID),
+		slog.String("status", string(roll.Status)),
+	)
 
 	httpapi.WriteJSON(h.logger, w, http.StatusCreated, roll)
 }
@@ -57,10 +65,12 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	rolls, err := h.service.List(r.Context())
 	if err != nil {
-		h.logger.Error("list film rolls", "error", err)
+		h.logger.Error("failed to list film rolls", slog.Any("error", err))
 		httpapi.WriteError(h.logger, w, http.StatusInternalServerError, "internal server error")
 		return
 	}
+
+	h.logger.Info("film rolls listed", slog.Int("count", len(rolls)))
 
 	httpapi.WriteJSON(h.logger, w, http.StatusOK, rolls)
 }
@@ -79,10 +89,18 @@ func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		h.logger.Error("get film roll", "error", err)
+		h.logger.Error("failed to get film roll", slog.Any("error", err))
 		httpapi.WriteError(h.logger, w, http.StatusInternalServerError, "internal server error")
 		return
 	}
+
+	h.logger.Info(
+		"film roll retrieved",
+		slog.Int64("film_roll_id", roll.ID),
+		slog.Int64("film_stock_id", roll.FilmStock.ID),
+		slog.Int64("format_id", roll.Format.ID),
+		slog.String("status", string(roll.Status)),
+	)
 
 	httpapi.WriteJSON(h.logger, w, http.StatusOK, roll)
 }
@@ -112,11 +130,17 @@ func (h *Handler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, ErrNotFound):
 			httpapi.WriteError(h.logger, w, http.StatusNotFound, "film roll not found")
 		default:
-			h.logger.Error("update film roll status", "error", err)
+			h.logger.Error("failed to update film roll status", slog.Any("error", err))
 			httpapi.WriteError(h.logger, w, http.StatusInternalServerError, "internal server error")
 		}
 		return
 	}
+
+	h.logger.Info(
+		"film roll status updated",
+		slog.Int64("film_roll_id", roll.ID),
+		slog.String("status", string(roll.Status)),
+	)
 
 	httpapi.WriteJSON(h.logger, w, http.StatusOK, roll)
 }
@@ -150,11 +174,17 @@ func (h *Handler) UpdateExposureISO(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, ErrNotFound):
 			httpapi.WriteError(h.logger, w, http.StatusNotFound, "film roll not found")
 		default:
-			h.logger.Error("update film roll exposure ISO", "error", err)
+			h.logger.Error("failed to update film roll exposure ISO", slog.Any("error", err))
 			httpapi.WriteError(h.logger, w, http.StatusInternalServerError, "internal server error")
 		}
 		return
 	}
+
+	h.logger.Info(
+		"film roll exposure ISO updated",
+		slog.Int64("film_roll_id", roll.ID),
+		slog.Int("exposure_iso", int(roll.ExposureISO)),
+	)
 
 	httpapi.WriteJSON(h.logger, w, http.StatusOK, roll)
 }
@@ -192,10 +222,17 @@ func (h *Handler) UpdateCamera(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		h.logger.Error("update film roll camera", "error", err)
+		h.logger.Error("failed to update film roll camera", slog.Any("error", err))
 		httpapi.WriteError(h.logger, w, http.StatusInternalServerError, "internal server error")
 		return
 	}
+
+	logAttrs := []any{slog.Int64("film_roll_id", roll.ID)}
+	if roll.Camera != nil {
+		logAttrs = append(logAttrs, slog.Int64("camera_id", roll.Camera.ID))
+	}
+
+	h.logger.Info("film roll camera updated", logAttrs...)
 
 	httpapi.WriteJSON(h.logger, w, http.StatusOK, roll)
 }
@@ -214,10 +251,12 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		h.logger.Error("delete film roll", "error", err)
+		h.logger.Error("failed to delete film roll", slog.Any("error", err))
 		httpapi.WriteError(h.logger, w, http.StatusInternalServerError, "internal server error")
 		return
 	}
+
+	h.logger.Info("film roll deleted", slog.Int64("film_roll_id", id))
 
 	w.WriteHeader(http.StatusNoContent)
 }
