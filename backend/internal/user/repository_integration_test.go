@@ -80,3 +80,43 @@ func TestRepositoryNotFound(t *testing.T) {
 		t.Fatalf("expected ErrNotFound by auth identity, got %v", err)
 	}
 }
+
+func TestRepositoryFindOrCreate(t *testing.T) {
+	pool := testutil.StartPostgres(t)
+	repository := user.NewRepository(pool)
+	ctx := t.Context()
+
+	created, err := repository.FindOrCreate(
+		ctx,
+		"old@example.com",
+		"Old Name",
+		"https://auth.example.com",
+		"external-user-42",
+	)
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	found, err := repository.FindOrCreate(
+		ctx,
+		"new@example.com",
+		"New Name",
+		created.AuthIssuer,
+		created.AuthSubject,
+	)
+	if err != nil {
+		t.Fatalf("find existing user: %v", err)
+	}
+
+	if found.ID != created.ID {
+		t.Fatalf("expected user id %d, got %d", created.ID, found.ID)
+	}
+
+	if found.Email != "new@example.com" {
+		t.Fatalf("expected updated email, got %q", found.Email)
+	}
+
+	if found.DisplayName != "New Name" {
+		t.Fatalf("expected updated display name, got %q", found.DisplayName)
+	}
+}

@@ -56,6 +56,29 @@ func (r *Repository) Create(
 	return fromDBUser(value), nil
 }
 
+func (r *Repository) FindOrCreate(
+	ctx context.Context,
+	email string,
+	displayName string,
+	authIssuer string,
+	authSubject string,
+) (User, error) {
+	value, err := r.queries.FindOrCreateUser(
+		ctx,
+		db.FindOrCreateUserParams{
+			Email:       email,
+			DisplayName: displayName,
+			AuthIssuer:  authIssuer,
+			AuthSubject: authSubject,
+		},
+	)
+	if err != nil {
+		return User{}, fmt.Errorf("find or create user: %w", err)
+	}
+
+	return fromDBUser(value), nil
+}
+
 func (r *Repository) GetByID(
 	ctx context.Context,
 	id int64,

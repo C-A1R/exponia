@@ -57,6 +57,58 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 	return i, err
 }
 
+const findOrCreateUser = `-- name: FindOrCreateUser :one
+INSERT INTO users (
+    email,
+    display_name,
+    auth_issuer,
+    auth_subject
+)
+VALUES (
+    $1,
+    $2,
+    $3,
+    $4
+)
+ON CONFLICT (auth_issuer, auth_subject)
+DO UPDATE SET
+    email = EXCLUDED.email,
+    display_name = EXCLUDED.display_name
+RETURNING
+    id,
+    email,
+    display_name,
+    auth_issuer,
+    auth_subject,
+    created_at
+`
+
+type FindOrCreateUserParams struct {
+	Email       string `json:"email"`
+	DisplayName string `json:"display_name"`
+	AuthIssuer  string `json:"auth_issuer"`
+	AuthSubject string `json:"auth_subject"`
+}
+
+func (q *Queries) FindOrCreateUser(ctx context.Context, arg FindOrCreateUserParams) (User, error) {
+	row := q.db.QueryRow(ctx, findOrCreateUser,
+		arg.Email,
+		arg.DisplayName,
+		arg.AuthIssuer,
+		arg.AuthSubject,
+	)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.DisplayName,
+		&i.AuthIssuer,
+		&i.AuthSubject,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getUserByAuthIdentity = `-- name: GetUserByAuthIdentity :one
 SELECT
     id,

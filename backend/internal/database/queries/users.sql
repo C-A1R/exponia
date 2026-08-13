@@ -19,6 +19,31 @@ RETURNING
     auth_subject,
     created_at;
 
+-- name: FindOrCreateUser :one
+INSERT INTO users (
+    email,
+    display_name,
+    auth_issuer,
+    auth_subject
+)
+VALUES (
+    sqlc.arg(email),
+    sqlc.arg(display_name),
+    sqlc.arg(auth_issuer),
+    sqlc.arg(auth_subject)
+)
+ON CONFLICT (auth_issuer, auth_subject)
+DO UPDATE SET
+    email = EXCLUDED.email,
+    display_name = EXCLUDED.display_name
+RETURNING
+    id,
+    email,
+    display_name,
+    auth_issuer,
+    auth_subject,
+    created_at;
+
 -- name: GetUserByID :one
 SELECT
     id,
