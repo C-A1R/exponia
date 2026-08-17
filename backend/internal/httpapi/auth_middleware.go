@@ -9,13 +9,6 @@ import (
 	"github.com/C-A1R/exponia/backend/internal/user"
 )
 
-type ExternalIdentity struct {
-	Email       string
-	DisplayName string
-	Issuer      string
-	Subject     string
-}
-
 type UserService interface {
 	FindOrCreate(
 		ctx context.Context,
@@ -27,7 +20,7 @@ type UserService interface {
 }
 
 func FixedIdentity(
-	externalIdentity ExternalIdentity,
+	externalIdentity identity.ExternalIdentity,
 	users UserService,
 	logger *slog.Logger,
 	next http.Handler,

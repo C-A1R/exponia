@@ -41,7 +41,7 @@ func TestFixedIdentity(t *testing.T) {
 	})
 
 	handler := FixedIdentity(
-		ExternalIdentity{
+		identity.ExternalIdentity{
 			Email:       "alex@example.com",
 			DisplayName: "Alex",
 			Issuer:      "https://auth.example.com",
@@ -77,7 +77,7 @@ func TestFixedIdentityReturnsError(t *testing.T) {
 	})
 
 	handler := FixedIdentity(
-		ExternalIdentity{},
+		identity.ExternalIdentity{},
 		users,
 		logger,
 		next,
