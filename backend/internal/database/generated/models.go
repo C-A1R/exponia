@@ -13,6 +13,7 @@ type Camera struct {
 	Manufacturer string             `json:"manufacturer"`
 	Model        string             `json:"model"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UserID       int64              `json:"user_id"`
 }
 
 type FilmColorType struct {

@@ -11,26 +11,33 @@ import (
 
 const createCamera = `-- name: CreateCamera :one
 INSERT INTO cameras (
+    user_id,
     manufacturer,
     model
 )
-VALUES ($1, $2)
-RETURNING id, manufacturer, model, created_at
+VALUES (
+    $1,
+    $2,
+    $3
+)
+RETURNING id, manufacturer, model, created_at, user_id
 `
 
 type CreateCameraParams struct {
+	UserID       int64  `json:"user_id"`
 	Manufacturer string `json:"manufacturer"`
 	Model        string `json:"model"`
 }
 
 func (q *Queries) CreateCamera(ctx context.Context, arg CreateCameraParams) (Camera, error) {
-	row := q.db.QueryRow(ctx, createCamera, arg.Manufacturer, arg.Model)
+	row := q.db.QueryRow(ctx, createCamera, arg.UserID, arg.Manufacturer, arg.Model)
 	var i Camera
 	err := row.Scan(
 		&i.ID,
 		&i.Manufacturer,
 		&i.Model,
 		&i.CreatedAt,
+		&i.UserID,
 	)
 	return i, err
 }
@@ -38,10 +45,16 @@ func (q *Queries) CreateCamera(ctx context.Context, arg CreateCameraParams) (Cam
 const deleteCamera = `-- name: DeleteCamera :execrows
 DELETE FROM cameras
 WHERE id = $1
+  AND user_id = $2
 `
 
-func (q *Queries) DeleteCamera(ctx context.Context, id int64) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteCamera, id)
+type DeleteCameraParams struct {
+	ID     int64 `json:"id"`
+	UserID int64 `json:"user_id"`
+}
+
+func (q *Queries) DeleteCamera(ctx context.Context, arg DeleteCameraParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteCamera, arg.ID, arg.UserID)
 	if err != nil {
 		return 0, err
 	}
@@ -49,31 +62,39 @@ func (q *Queries) DeleteCamera(ctx context.Context, id int64) (int64, error) {
 }
 
 const getCameraByID = `-- name: GetCameraByID :one
-SELECT id, manufacturer, model, created_at
+SELECT id, manufacturer, model, created_at, user_id
 FROM cameras
 WHERE id = $1
+  AND user_id = $2
 `
 
-func (q *Queries) GetCameraByID(ctx context.Context, id int64) (Camera, error) {
-	row := q.db.QueryRow(ctx, getCameraByID, id)
+type GetCameraByIDParams struct {
+	ID     int64 `json:"id"`
+	UserID int64 `json:"user_id"`
+}
+
+func (q *Queries) GetCameraByID(ctx context.Context, arg GetCameraByIDParams) (Camera, error) {
+	row := q.db.QueryRow(ctx, getCameraByID, arg.ID, arg.UserID)
 	var i Camera
 	err := row.Scan(
 		&i.ID,
 		&i.Manufacturer,
 		&i.Model,
 		&i.CreatedAt,
+		&i.UserID,
 	)
 	return i, err
 }
 
 const listCameras = `-- name: ListCameras :many
-SELECT id, manufacturer, model, created_at
+SELECT id, manufacturer, model, created_at, user_id
 FROM cameras
+WHERE user_id = $1
 ORDER BY created_at DESC
 `
 
-func (q *Queries) ListCameras(ctx context.Context) ([]Camera, error) {
-	rows, err := q.db.Query(ctx, listCameras)
+func (q *Queries) ListCameras(ctx context.Context, userID int64) ([]Camera, error) {
+	rows, err := q.db.Query(ctx, listCameras, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -86,6 +107,7 @@ func (q *Queries) ListCameras(ctx context.Context) ([]Camera, error) {
 			&i.Manufacturer,
 			&i.Model,
 			&i.CreatedAt,
+			&i.UserID,
 		); err != nil {
 			return nil, err
 		}
@@ -100,26 +122,34 @@ func (q *Queries) ListCameras(ctx context.Context) ([]Camera, error) {
 const updateCamera = `-- name: UpdateCamera :one
 UPDATE cameras
 SET
-    manufacturer = $2,
-    model = $3
-WHERE id = $1
-RETURNING id, manufacturer, model, created_at
+    manufacturer = $1,
+    model = $2
+WHERE id = $3
+  AND user_id = $4
+RETURNING id, manufacturer, model, created_at, user_id
 `
 
 type UpdateCameraParams struct {
-	ID           int64  `json:"id"`
 	Manufacturer string `json:"manufacturer"`
 	Model        string `json:"model"`
+	ID           int64  `json:"id"`
+	UserID       int64  `json:"user_id"`
 }
 
 func (q *Queries) UpdateCamera(ctx context.Context, arg UpdateCameraParams) (Camera, error) {
-	row := q.db.QueryRow(ctx, updateCamera, arg.ID, arg.Manufacturer, arg.Model)
+	row := q.db.QueryRow(ctx, updateCamera,
+		arg.Manufacturer,
+		arg.Model,
+		arg.ID,
+		arg.UserID,
+	)
 	var i Camera
 	err := row.Scan(
 		&i.ID,
 		&i.Manufacturer,
 		&i.Model,
 		&i.CreatedAt,
+		&i.UserID,
 	)
 	return i, err
 }
