@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -10,6 +11,12 @@ import (
 )
 
 type UserService interface {
+	GetByAuthIdentity(
+		ctx context.Context,
+		authIssuer string,
+		authSubject string,
+	) (user.User, error)
+
 	FindOrCreate(
 		ctx context.Context,
 		email string,
@@ -19,31 +26,35 @@ type UserService interface {
 	) (user.User, error)
 }
 
-func FixedIdentity(
-	externalIdentity identity.ExternalIdentity,
+func ResolveUser(
 	users UserService,
 	logger *slog.Logger,
 	next http.Handler,
 ) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		currentUser, err := users.FindOrCreate(
+		externalIdentity, ok := identity.ExternalIdentityFromContext(r.Context())
+		if !ok {
+			WriteError(logger, w, http.StatusUnauthorized, "authentication required")
+			return
+		}
+
+		currentUser, err := users.GetByAuthIdentity(
 			r.Context(),
-			externalIdentity.Email,
-			externalIdentity.DisplayName,
 			externalIdentity.Issuer,
 			externalIdentity.Subject,
 		)
+		if errors.Is(err, user.ErrNotFound) {
+			currentUser, err = users.FindOrCreate(
+				r.Context(),
+				externalIdentity.Email,
+				externalIdentity.DisplayName,
+				externalIdentity.Issuer,
+				externalIdentity.Subject,
+			)
+		}
 		if err != nil {
-			logger.Error(
-				"failed to resolve authenticated user",
-				slog.Any("error", err),
-			)
-			WriteError(
-				logger,
-				w,
-				http.StatusInternalServerError,
-				"internal server error",
-			)
+			logger.Error("failed to resolve authenticated user", slog.Any("error", err))
+			WriteError(logger, w, http.StatusInternalServerError, "internal server error")
 			return
 		}
 

@@ -13,6 +13,8 @@ import (
 	"github.com/C-A1R/exponia/backend/internal/database"
 	"github.com/C-A1R/exponia/backend/internal/httpapi"
 	"github.com/C-A1R/exponia/backend/internal/logger"
+	"github.com/C-A1R/exponia/backend/internal/supabaseauth"
+	"github.com/C-A1R/exponia/backend/internal/user"
 
 	"github.com/C-A1R/exponia/backend/internal/camera"
 	"github.com/C-A1R/exponia/backend/internal/filmroll"
@@ -35,13 +37,15 @@ func main() {
 		appLogger.Error("DATABASE_URL is not set")
 		return
 	}
+	authIssuer := os.Getenv("SUPABASE_AUTH_ISSUER")
+	if authIssuer == "" {
+		appLogger.Error("SUPABASE_AUTH_ISSUER is not set")
+		return
+	}
 
 	db, err := database.Open(context.Background(), databaseURL)
 	if err != nil {
-		appLogger.Error(
-			"failed to open database",
-			slog.Any("error", err),
-		)
+		appLogger.Error("failed to open database", slog.Any("error", err))
 		return
 	}
 	defer db.Close()
@@ -50,26 +54,33 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", healthHandler(appLogger))
+	apiMux := http.NewServeMux()
 
 	cameraRepository := camera.NewRepository(db)
 	cameraService := camera.NewService(cameraRepository)
 	cameraHandler := camera.NewHandler(cameraService, appLogger)
-	camera.RegisterRoutes(mux, cameraHandler)
+	camera.RegisterRoutes(apiMux, cameraHandler)
 
 	lensRepository := lens.NewRepository(db)
 	lensService := lens.NewService(lensRepository)
 	lensHandler := lens.NewHandler(lensService, appLogger)
-	lens.RegisterRoutes(mux, lensHandler)
+	lens.RegisterRoutes(apiMux, lensHandler)
 
 	filmStockRepository := filmstock.NewRepository(db)
 	filmStockService := filmstock.NewService(filmStockRepository)
 	filmStockHandler := filmstock.NewHandler(filmStockService, appLogger)
-	filmstock.RegisterRoutes(mux, filmStockHandler)
+	filmstock.RegisterRoutes(apiMux, filmStockHandler)
 
 	filmRollRepository := filmroll.NewRepository(db)
 	filmRollService := filmroll.NewService(filmRollRepository)
 	filmRollHandler := filmroll.NewHandler(filmRollService, appLogger)
-	filmroll.RegisterRoutes(mux, filmRollHandler)
+	filmroll.RegisterRoutes(apiMux, filmRollHandler)
+
+	userRepository := user.NewRepository(db)
+	userService := user.NewService(userRepository)
+	tokenVerifier := supabaseauth.NewVerifier(context.Background(), authIssuer)
+	protectedAPI := httpapi.AuthenticateBearer(tokenVerifier, appLogger, httpapi.ResolveUser(userService, appLogger, apiMux))
+	mux.Handle("/api/v1/", protectedAPI)
 
 	server := &http.Server{
 		Addr:              ":8080",
