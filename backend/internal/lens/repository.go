@@ -35,6 +35,7 @@ func fromDBLens(value db.Lense) Lens {
 
 func (r *Repository) Create(
 	ctx context.Context,
+	userID int64,
 	manufacturer string,
 	model string,
 	focalLengthMm int32,
@@ -43,6 +44,7 @@ func (r *Repository) Create(
 	value, err := r.queries.CreateLens(
 		ctx,
 		db.CreateLensParams{
+			UserID:        userID,
 			Manufacturer:  manufacturer,
 			Model:         model,
 			FocalLengthMm: focalLengthMm,
@@ -56,8 +58,11 @@ func (r *Repository) Create(
 	return fromDBLens(value), nil
 }
 
-func (r *Repository) List(ctx context.Context) ([]Lens, error) {
-	values, err := r.queries.ListLenses(ctx)
+func (r *Repository) List(
+	ctx context.Context,
+	userID int64,
+) ([]Lens, error) {
+	values, err := r.queries.ListLenses(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("list lenses: %w", err)
 	}
@@ -73,9 +78,16 @@ func (r *Repository) List(ctx context.Context) ([]Lens, error) {
 
 func (r *Repository) GetByID(
 	ctx context.Context,
-	id int64,
+	userID int64,
+	lensID int64,
 ) (Lens, error) {
-	value, err := r.queries.GetLensByID(ctx, id)
+	value, err := r.queries.GetLensByID(
+		ctx,
+		db.GetLensByIDParams{
+			ID:     lensID,
+			UserID: userID,
+		},
+	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Lens{}, ErrNotFound
@@ -89,7 +101,8 @@ func (r *Repository) GetByID(
 
 func (r *Repository) Update(
 	ctx context.Context,
-	id int64,
+	userID int64,
+	lensID int64,
 	manufacturer string,
 	model string,
 	focalLengthMm int32,
@@ -98,7 +111,8 @@ func (r *Repository) Update(
 	value, err := r.queries.UpdateLens(
 		ctx,
 		db.UpdateLensParams{
-			ID:            id,
+			ID:            lensID,
+			UserID:        userID,
 			Manufacturer:  manufacturer,
 			Model:         model,
 			FocalLengthMm: focalLengthMm,
@@ -118,9 +132,16 @@ func (r *Repository) Update(
 
 func (r *Repository) Delete(
 	ctx context.Context,
-	id int64,
+	userID int64,
+	lensID int64,
 ) error {
-	rowsAffected, err := r.queries.DeleteLens(ctx, id)
+	rowsAffected, err := r.queries.DeleteLens(
+		ctx,
+		db.DeleteLensParams{
+			ID:     lensID,
+			UserID: userID,
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("delete lens: %w", err)
 	}

@@ -5,22 +5,28 @@ import "context"
 type LensRepository interface {
 	Create(
 		ctx context.Context,
+		userID int64,
 		manufacturer string,
 		model string,
 		focalLengthMm int32,
 		maxAperture float64,
 	) (Lens, error)
 
-	List(ctx context.Context) ([]Lens, error)
+	List(
+		ctx context.Context,
+		userID int64,
+	) ([]Lens, error)
 
 	GetByID(
 		ctx context.Context,
-		id int64,
+		userID int64,
+		lensID int64,
 	) (Lens, error)
 
 	Update(
 		ctx context.Context,
-		id int64,
+		userID int64,
+		lensID int64,
 		manufacturer string,
 		model string,
 		focalLengthMm int32,
@@ -29,7 +35,8 @@ type LensRepository interface {
 
 	Delete(
 		ctx context.Context,
-		id int64,
+		userID int64,
+		lensID int64,
 	) error
 }
 
@@ -45,6 +52,7 @@ func NewService(repository LensRepository) *Service {
 
 func (s *Service) Create(
 	ctx context.Context,
+	userID int64,
 	manufacturer string,
 	model string,
 	focalLengthMm int32,
@@ -52,6 +60,7 @@ func (s *Service) Create(
 ) (Lens, error) {
 	return s.repository.Create(
 		ctx,
+		userID,
 		manufacturer,
 		model,
 		focalLengthMm,
@@ -59,20 +68,25 @@ func (s *Service) Create(
 	)
 }
 
-func (s *Service) List(ctx context.Context) ([]Lens, error) {
-	return s.repository.List(ctx)
+func (s *Service) List(
+	ctx context.Context,
+	userID int64,
+) ([]Lens, error) {
+	return s.repository.List(ctx, userID)
 }
 
 func (s *Service) GetByID(
 	ctx context.Context,
-	id int64,
+	userID int64,
+	lensID int64,
 ) (Lens, error) {
-	return s.repository.GetByID(ctx, id)
+	return s.repository.GetByID(ctx, userID, lensID)
 }
 
 func (s *Service) Update(
 	ctx context.Context,
-	id int64,
+	userID int64,
+	lensID int64,
 	manufacturer string,
 	model string,
 	focalLengthMm int32,
@@ -80,7 +94,8 @@ func (s *Service) Update(
 ) (Lens, error) {
 	return s.repository.Update(
 		ctx,
-		id,
+		userID,
+		lensID,
 		manufacturer,
 		model,
 		focalLengthMm,
@@ -90,7 +105,8 @@ func (s *Service) Update(
 
 func (s *Service) Delete(
 	ctx context.Context,
-	id int64,
+	userID int64,
+	lensID int64,
 ) error {
-	return s.repository.Delete(ctx, id)
+	return s.repository.Delete(ctx, userID, lensID)
 }

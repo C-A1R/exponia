@@ -10,14 +10,59 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/C-A1R/exponia/backend/internal/identity"
 	"github.com/C-A1R/exponia/backend/internal/lens"
 	"github.com/C-A1R/exponia/backend/internal/testutil"
+	"github.com/C-A1R/exponia/backend/internal/user"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func setupLensAPI(t *testing.T) *http.ServeMux {
+func createLensTestUser(
+	t *testing.T,
+	pool *pgxpool.Pool,
+	name string,
+) int64 {
+	t.Helper()
+
+	repository := user.NewRepository(pool)
+	created, err := repository.FindOrCreate(
+		t.Context(),
+		fmt.Sprintf("%s@example.com", name),
+		name,
+		"https://auth.example.com",
+		name,
+	)
+	if err != nil {
+		t.Fatalf("create test user: %v", err)
+	}
+
+	return created.ID
+}
+
+func lensRequestAsUser(
+	request *http.Request,
+	userID int64,
+) *http.Request {
+	return request.WithContext(
+		identity.WithUserID(request.Context(), userID),
+	)
+}
+
+func setupLensAPI(t *testing.T) http.Handler {
 	t.Helper()
 
 	pool := testutil.StartPostgres(t)
+	userRepository := user.NewRepository(pool)
+	currentUser, err := userRepository.FindOrCreate(
+		t.Context(),
+		"lens-test@example.com",
+		"Lens Test",
+		"https://auth.example.com",
+		"lens-test-user",
+	)
+	if err != nil {
+		t.Fatalf("create test user: %v", err)
+	}
 
 	logger := slog.New(
 		slog.NewTextHandler(io.Discard, nil),
@@ -30,7 +75,10 @@ func setupLensAPI(t *testing.T) *http.ServeMux {
 	mux := http.NewServeMux()
 	lens.RegisterRoutes(mux, handler)
 
-	return mux
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := identity.WithUserID(r.Context(), currentUser.ID)
+		mux.ServeHTTP(w, r.WithContext(ctx))
+	})
 }
 
 func TestListLensesEmpty(t *testing.T) {
@@ -232,6 +280,139 @@ func TestLensCRUD(t *testing.T) {
 			"get deleted: expected status %d, got %d",
 			http.StatusNotFound,
 			recorder.Code,
+		)
+	}
+}
+
+func TestLensOwnership(t *testing.T) {
+	pool := testutil.StartPostgres(t)
+	ownerID := createLensTestUser(t, pool, "lens-owner")
+	otherUserID := createLensTestUser(t, pool, "other-lens-user")
+
+	repository := lens.NewRepository(pool)
+	created, err := repository.Create(
+		t.Context(),
+		ownerID,
+		"Nikon",
+		"Nikkor 50mm f/1.8 Ai-S",
+		50,
+		1.8,
+	)
+	if err != nil {
+		t.Fatalf("create owner lens: %v", err)
+	}
+
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	service := lens.NewService(repository)
+	handler := lens.NewHandler(service, logger)
+	mux := http.NewServeMux()
+	lens.RegisterRoutes(mux, handler)
+
+	listRequest := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/lenses",
+		nil,
+	)
+	listRecorder := httptest.NewRecorder()
+	mux.ServeHTTP(
+		listRecorder,
+		lensRequestAsUser(listRequest, otherUserID),
+	)
+
+	if listRecorder.Code != http.StatusOK {
+		t.Fatalf(
+			"list: expected status %d, got %d",
+			http.StatusOK,
+			listRecorder.Code,
+		)
+	}
+
+	if listRecorder.Body.String() != "[]\n" {
+		t.Fatalf(
+			"list: expected other user to see no lenses, got %q",
+			listRecorder.Body.String(),
+		)
+	}
+
+	getRequest := httptest.NewRequest(
+		http.MethodGet,
+		fmt.Sprintf("/api/v1/lenses/%d", created.ID),
+		nil,
+	)
+	getRecorder := httptest.NewRecorder()
+	mux.ServeHTTP(
+		getRecorder,
+		lensRequestAsUser(getRequest, otherUserID),
+	)
+
+	if getRecorder.Code != http.StatusNotFound {
+		t.Fatalf(
+			"get: expected status %d, got %d",
+			http.StatusNotFound,
+			getRecorder.Code,
+		)
+	}
+
+	updateRequest := httptest.NewRequest(
+		http.MethodPut,
+		fmt.Sprintf("/api/v1/lenses/%d", created.ID),
+		strings.NewReader(`{
+			"manufacturer": "Leica",
+			"model": "Summicron-M 50mm f/2",
+			"focal_length_mm": 50,
+			"max_aperture": 2
+		}`),
+	)
+	updateRecorder := httptest.NewRecorder()
+	mux.ServeHTTP(
+		updateRecorder,
+		lensRequestAsUser(updateRequest, otherUserID),
+	)
+
+	if updateRecorder.Code != http.StatusNotFound {
+		t.Fatalf(
+			"update: expected status %d, got %d",
+			http.StatusNotFound,
+			updateRecorder.Code,
+		)
+	}
+
+	deleteRequest := httptest.NewRequest(
+		http.MethodDelete,
+		fmt.Sprintf("/api/v1/lenses/%d", created.ID),
+		nil,
+	)
+	deleteRecorder := httptest.NewRecorder()
+	mux.ServeHTTP(
+		deleteRecorder,
+		lensRequestAsUser(deleteRequest, otherUserID),
+	)
+
+	if deleteRecorder.Code != http.StatusNotFound {
+		t.Fatalf(
+			"delete: expected status %d, got %d",
+			http.StatusNotFound,
+			deleteRecorder.Code,
+		)
+	}
+
+	ownerLens, err := repository.GetByID(
+		t.Context(),
+		ownerID,
+		created.ID,
+	)
+	if err != nil {
+		t.Fatalf("get owner lens after other user's requests: %v", err)
+	}
+
+	if ownerLens.Manufacturer != "Nikon" ||
+		ownerLens.Model != "Nikkor 50mm f/1.8 Ai-S" ||
+		ownerLens.MaxAperture != 1.8 {
+		t.Fatalf(
+			"expected owner lens to remain unchanged, got %s %s f/%.1f",
+			ownerLens.Manufacturer,
+			ownerLens.Model,
+			ownerLens.MaxAperture,
 		)
 	}
 }

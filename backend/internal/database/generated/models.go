@@ -59,6 +59,7 @@ type Lense struct {
 	FocalLengthMm int32              `json:"focal_length_mm"`
 	MaxAperture   float64            `json:"max_aperture"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UserID        int64              `json:"user_id"`
 }
 
 type User struct {
