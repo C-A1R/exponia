@@ -28,6 +28,11 @@ type createFilmRollRequest struct {
 }
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httpapi.RequireUser(h.logger, w, r)
+	if !ok {
+		return
+	}
+
 	var req createFilmRollRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -42,6 +47,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	roll, err := h.service.Create(
 		r.Context(),
+		userID,
 		req.FilmStockID,
 		req.FormatID,
 	)
@@ -63,7 +69,12 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
-	rolls, err := h.service.List(r.Context())
+	userID, ok := httpapi.RequireUser(h.logger, w, r)
+	if !ok {
+		return
+	}
+
+	rolls, err := h.service.List(r.Context(), userID)
 	if err != nil {
 		h.logger.Error("failed to list film rolls", slog.Any("error", err))
 		httpapi.WriteError(h.logger, w, http.StatusInternalServerError, "internal server error")
@@ -76,13 +87,18 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httpapi.RequireUser(h.logger, w, r)
+	if !ok {
+		return
+	}
+
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil || id <= 0 {
 		httpapi.WriteError(h.logger, w, http.StatusBadRequest, "invalid film roll id")
 		return
 	}
 
-	roll, err := h.service.GetByID(r.Context(), id)
+	roll, err := h.service.GetByID(r.Context(), userID, id)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			httpapi.WriteError(h.logger, w, http.StatusNotFound, "film roll not found")
@@ -110,6 +126,11 @@ type updateStatusRequest struct {
 }
 
 func (h *Handler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httpapi.RequireUser(h.logger, w, r)
+	if !ok {
+		return
+	}
+
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil || id <= 0 {
 		httpapi.WriteError(h.logger, w, http.StatusBadRequest, "invalid film roll id")
@@ -122,7 +143,12 @@ func (h *Handler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	roll, err := h.service.UpdateStatus(r.Context(), id, req.Status)
+	roll, err := h.service.UpdateStatus(
+		r.Context(),
+		userID,
+		id,
+		req.Status,
+	)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrInvalidStatus):
@@ -150,6 +176,11 @@ type updateExposureISORequest struct {
 }
 
 func (h *Handler) UpdateExposureISO(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httpapi.RequireUser(h.logger, w, r)
+	if !ok {
+		return
+	}
+
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil || id <= 0 {
 		httpapi.WriteError(h.logger, w, http.StatusBadRequest, "invalid film roll id")
@@ -164,6 +195,7 @@ func (h *Handler) UpdateExposureISO(w http.ResponseWriter, r *http.Request) {
 
 	roll, err := h.service.UpdateExposureISO(
 		r.Context(),
+		userID,
 		id,
 		req.ExposureISO,
 	)
@@ -194,6 +226,11 @@ type updateCameraRequest struct {
 }
 
 func (h *Handler) UpdateCamera(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httpapi.RequireUser(h.logger, w, r)
+	if !ok {
+		return
+	}
+
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil || id <= 0 {
 		httpapi.WriteError(h.logger, w, http.StatusBadRequest, "invalid film roll id")
@@ -213,6 +250,7 @@ func (h *Handler) UpdateCamera(w http.ResponseWriter, r *http.Request) {
 
 	roll, err := h.service.UpdateCamera(
 		r.Context(),
+		userID,
 		id,
 		req.CameraID,
 	)
@@ -238,13 +276,18 @@ func (h *Handler) UpdateCamera(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httpapi.RequireUser(h.logger, w, r)
+	if !ok {
+		return
+	}
+
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil || id <= 0 {
 		httpapi.WriteError(h.logger, w, http.StatusBadRequest, "invalid film roll id")
 		return
 	}
 
-	err = h.service.Delete(r.Context(), id)
+	err = h.service.Delete(r.Context(), userID, id)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			httpapi.WriteError(h.logger, w, http.StatusNotFound, "film roll not found")

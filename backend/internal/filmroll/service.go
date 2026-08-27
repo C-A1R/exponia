@@ -11,40 +11,47 @@ var ErrInvalidExposureISO = errors.New("invalid exposure ISO")
 type FilmRollRepository interface {
 	Create(
 		ctx context.Context,
+		userID int64,
 		filmStockID int64,
 		formatID int64,
 	) (FilmRoll, error)
 
 	GetByID(
 		ctx context.Context,
-		id int64,
+		userID int64,
+		filmRollID int64,
 	) (FilmRoll, error)
 
 	List(
 		ctx context.Context,
+		userID int64,
 	) ([]FilmRoll, error)
 
 	UpdateStatus(
 		ctx context.Context,
-		id int64,
+		userID int64,
+		filmRollID int64,
 		status FilmRollStatus,
 	) (FilmRoll, error)
 
 	UpdateExposureISO(
 		ctx context.Context,
-		id int64,
+		userID int64,
+		filmRollID int64,
 		exposureISO int32,
 	) (FilmRoll, error)
 
 	UpdateCamera(
 		ctx context.Context,
-		id int64,
+		userID int64,
+		filmRollID int64,
 		cameraID *int64,
 	) (FilmRoll, error)
 
 	Delete(
 		ctx context.Context,
-		id int64,
+		userID int64,
+		filmRollID int64,
 	) error
 }
 
@@ -60,23 +67,26 @@ func NewService(repository FilmRollRepository) *Service {
 
 func (s *Service) Create(
 	ctx context.Context,
+	userID int64,
 	filmStockID int64,
 	formatID int64,
 ) (FilmRoll, error) {
-	return s.repository.Create(ctx, filmStockID, formatID)
+	return s.repository.Create(ctx, userID, filmStockID, formatID)
 }
 
 func (s *Service) GetByID(
 	ctx context.Context,
-	id int64,
+	userID int64,
+	filmRollID int64,
 ) (FilmRoll, error) {
-	return s.repository.GetByID(ctx, id)
+	return s.repository.GetByID(ctx, userID, filmRollID)
 }
 
 func (s *Service) List(
 	ctx context.Context,
+	userID int64,
 ) ([]FilmRoll, error) {
-	return s.repository.List(ctx)
+	return s.repository.List(ctx, userID)
 }
 
 func isValidStatus(status FilmRollStatus) bool {
@@ -94,39 +104,48 @@ func isValidStatus(status FilmRollStatus) bool {
 
 func (s *Service) UpdateStatus(
 	ctx context.Context,
-	id int64,
+	userID int64,
+	filmRollID int64,
 	status FilmRollStatus,
 ) (FilmRoll, error) {
 	if !isValidStatus(status) {
 		return FilmRoll{}, ErrInvalidStatus
 	}
 
-	return s.repository.UpdateStatus(ctx, id, status)
+	return s.repository.UpdateStatus(ctx, userID, filmRollID, status)
 }
 
 func (s *Service) UpdateExposureISO(
 	ctx context.Context,
-	id int64,
+	userID int64,
+	filmRollID int64,
 	exposureISO int32,
 ) (FilmRoll, error) {
 	if exposureISO <= 0 {
 		return FilmRoll{}, ErrInvalidExposureISO
 	}
 
-	return s.repository.UpdateExposureISO(ctx, id, exposureISO)
+	return s.repository.UpdateExposureISO(
+		ctx,
+		userID,
+		filmRollID,
+		exposureISO,
+	)
 }
 
 func (s *Service) UpdateCamera(
 	ctx context.Context,
-	id int64,
+	userID int64,
+	filmRollID int64,
 	cameraID *int64,
 ) (FilmRoll, error) {
-	return s.repository.UpdateCamera(ctx, id, cameraID)
+	return s.repository.UpdateCamera(ctx, userID, filmRollID, cameraID)
 }
 
 func (s *Service) Delete(
 	ctx context.Context,
-	id int64,
+	userID int64,
+	filmRollID int64,
 ) error {
-	return s.repository.Delete(ctx, id)
+	return s.repository.Delete(ctx, userID, filmRollID)
 }

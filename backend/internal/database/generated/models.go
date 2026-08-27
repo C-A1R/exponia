@@ -36,6 +36,7 @@ type FilmRoll struct {
 	ExposureIso int32              `json:"exposure_iso"`
 	Status      string             `json:"status"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UserID      int64              `json:"user_id"`
 }
 
 type FilmStock struct {
