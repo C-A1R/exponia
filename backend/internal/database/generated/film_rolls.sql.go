@@ -13,26 +13,29 @@ import (
 
 const createFilmRoll = `-- name: CreateFilmRoll :one
 INSERT INTO film_rolls (
+    user_id,
     film_stock_id,
     format_id,
     exposure_iso
 )
 SELECT
-    fs.id,
     $1,
+    fs.id,
+    $2,
     fs.iso
 FROM film_stocks fs
-WHERE fs.id = $2
+WHERE fs.id = $3
 RETURNING id
 `
 
 type CreateFilmRollParams struct {
+	UserID      int64 `json:"user_id"`
 	FormatID    int64 `json:"format_id"`
 	FilmStockID int64 `json:"film_stock_id"`
 }
 
 func (q *Queries) CreateFilmRoll(ctx context.Context, arg CreateFilmRollParams) (int64, error) {
-	row := q.db.QueryRow(ctx, createFilmRoll, arg.FormatID, arg.FilmStockID)
+	row := q.db.QueryRow(ctx, createFilmRoll, arg.UserID, arg.FormatID, arg.FilmStockID)
 	var id int64
 	err := row.Scan(&id)
 	return id, err
@@ -41,10 +44,16 @@ func (q *Queries) CreateFilmRoll(ctx context.Context, arg CreateFilmRollParams) 
 const deleteFilmRoll = `-- name: DeleteFilmRoll :execrows
 DELETE FROM film_rolls
 WHERE id = $1
+  AND user_id = $2
 `
 
-func (q *Queries) DeleteFilmRoll(ctx context.Context, id int64) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteFilmRoll, id)
+type DeleteFilmRollParams struct {
+	ID     int64 `json:"id"`
+	UserID int64 `json:"user_id"`
+}
+
+func (q *Queries) DeleteFilmRoll(ctx context.Context, arg DeleteFilmRollParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteFilmRoll, arg.ID, arg.UserID)
 	if err != nil {
 		return 0, err
 	}
@@ -79,8 +88,15 @@ JOIN film_formats ff
     ON ff.id = fr.format_id
 LEFT JOIN cameras c
     ON c.id = fr.camera_id
+   AND c.user_id = fr.user_id
 WHERE fr.id = $1
+  AND fr.user_id = $2
 `
+
+type GetFilmRollByIDParams struct {
+	ID     int64 `json:"id"`
+	UserID int64 `json:"user_id"`
+}
 
 type GetFilmRollByIDRow struct {
 	ID                    int64              `json:"id"`
@@ -99,8 +115,8 @@ type GetFilmRollByIDRow struct {
 	CreatedAt             pgtype.Timestamptz `json:"created_at"`
 }
 
-func (q *Queries) GetFilmRollByID(ctx context.Context, id int64) (GetFilmRollByIDRow, error) {
-	row := q.db.QueryRow(ctx, getFilmRollByID, id)
+func (q *Queries) GetFilmRollByID(ctx context.Context, arg GetFilmRollByIDParams) (GetFilmRollByIDRow, error) {
+	row := q.db.QueryRow(ctx, getFilmRollByID, arg.ID, arg.UserID)
 	var i GetFilmRollByIDRow
 	err := row.Scan(
 		&i.ID,
@@ -149,6 +165,8 @@ JOIN film_formats ff
     ON ff.id = fr.format_id
 LEFT JOIN cameras c
     ON c.id = fr.camera_id
+   AND c.user_id = fr.user_id
+WHERE fr.user_id = $1
 ORDER BY fr.created_at DESC
 `
 
@@ -169,8 +187,8 @@ type ListFilmRollsRow struct {
 	CreatedAt             pgtype.Timestamptz `json:"created_at"`
 }
 
-func (q *Queries) ListFilmRolls(ctx context.Context) ([]ListFilmRollsRow, error) {
-	rows, err := q.db.Query(ctx, listFilmRolls)
+func (q *Queries) ListFilmRolls(ctx context.Context, userID int64) ([]ListFilmRollsRow, error) {
+	rows, err := q.db.Query(ctx, listFilmRolls, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -205,19 +223,30 @@ func (q *Queries) ListFilmRolls(ctx context.Context) ([]ListFilmRollsRow, error)
 }
 
 const updateFilmRollCamera = `-- name: UpdateFilmRollCamera :one
-UPDATE film_rolls
-SET camera_id = $2
-WHERE id = $1
-RETURNING id
+UPDATE film_rolls fr
+SET camera_id = $1
+WHERE fr.id = $2
+  AND fr.user_id = $3
+  AND (
+      $1::BIGINT IS NULL
+      OR EXISTS (
+          SELECT 1
+          FROM cameras c
+          WHERE c.id = $1
+            AND c.user_id = $3
+      )
+  )
+RETURNING fr.id
 `
 
 type UpdateFilmRollCameraParams struct {
-	ID       int64       `json:"id"`
 	CameraID pgtype.Int8 `json:"camera_id"`
+	ID       int64       `json:"id"`
+	UserID   int64       `json:"user_id"`
 }
 
 func (q *Queries) UpdateFilmRollCamera(ctx context.Context, arg UpdateFilmRollCameraParams) (int64, error) {
-	row := q.db.QueryRow(ctx, updateFilmRollCamera, arg.ID, arg.CameraID)
+	row := q.db.QueryRow(ctx, updateFilmRollCamera, arg.CameraID, arg.ID, arg.UserID)
 	var id int64
 	err := row.Scan(&id)
 	return id, err
@@ -225,18 +254,20 @@ func (q *Queries) UpdateFilmRollCamera(ctx context.Context, arg UpdateFilmRollCa
 
 const updateFilmRollExposureISO = `-- name: UpdateFilmRollExposureISO :one
 UPDATE film_rolls
-SET exposure_iso = $2
-WHERE id = $1
+SET exposure_iso = $1
+WHERE id = $2
+  AND user_id = $3
 RETURNING id
 `
 
 type UpdateFilmRollExposureISOParams struct {
-	ID          int64 `json:"id"`
 	ExposureIso int32 `json:"exposure_iso"`
+	ID          int64 `json:"id"`
+	UserID      int64 `json:"user_id"`
 }
 
 func (q *Queries) UpdateFilmRollExposureISO(ctx context.Context, arg UpdateFilmRollExposureISOParams) (int64, error) {
-	row := q.db.QueryRow(ctx, updateFilmRollExposureISO, arg.ID, arg.ExposureIso)
+	row := q.db.QueryRow(ctx, updateFilmRollExposureISO, arg.ExposureIso, arg.ID, arg.UserID)
 	var id int64
 	err := row.Scan(&id)
 	return id, err
@@ -244,18 +275,20 @@ func (q *Queries) UpdateFilmRollExposureISO(ctx context.Context, arg UpdateFilmR
 
 const updateFilmRollStatus = `-- name: UpdateFilmRollStatus :one
 UPDATE film_rolls
-SET status = $2
-WHERE id = $1
+SET status = $1
+WHERE id = $2
+  AND user_id = $3
 RETURNING id
 `
 
 type UpdateFilmRollStatusParams struct {
-	ID     int64  `json:"id"`
 	Status string `json:"status"`
+	ID     int64  `json:"id"`
+	UserID int64  `json:"user_id"`
 }
 
 func (q *Queries) UpdateFilmRollStatus(ctx context.Context, arg UpdateFilmRollStatusParams) (int64, error) {
-	row := q.db.QueryRow(ctx, updateFilmRollStatus, arg.ID, arg.Status)
+	row := q.db.QueryRow(ctx, updateFilmRollStatus, arg.Status, arg.ID, arg.UserID)
 	var id int64
 	err := row.Scan(&id)
 	return id, err

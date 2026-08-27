@@ -12,8 +12,6 @@ import (
 
 var ErrNotFound = errors.New("camera not found")
 
-type Camera = db.Camera
-
 type Repository struct {
 	queries *db.Queries
 }
@@ -22,14 +20,25 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	return &Repository{queries: db.New(pool)}
 }
 
+func fromDBCamera(value db.Camera) Camera {
+	return Camera{
+		ID:           value.ID,
+		Manufacturer: value.Manufacturer,
+		Model:        value.Model,
+		CreatedAt:    value.CreatedAt.Time,
+	}
+}
+
 func (r *Repository) CreateCamera(
 	ctx context.Context,
+	userID int64,
 	manufacturer string,
 	model string,
 ) (Camera, error) {
 	camera, err := r.queries.CreateCamera(
 		ctx,
 		db.CreateCameraParams{
+			UserID:       userID,
 			Manufacturer: manufacturer,
 			Model:        model,
 		},
@@ -38,24 +47,38 @@ func (r *Repository) CreateCamera(
 		return Camera{}, fmt.Errorf("create camera: %w", err)
 	}
 
-	return camera, nil
+	return fromDBCamera(camera), nil
 }
 
-func (r *Repository) ListCameras(ctx context.Context) ([]Camera, error) {
-	cameras, err := r.queries.ListCameras(ctx)
+func (r *Repository) ListCameras(
+	ctx context.Context,
+	userID int64,
+) ([]Camera, error) {
+	values, err := r.queries.ListCameras(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("list cameras: %w", err)
 	}
 
-	if cameras == nil {
-		cameras = make([]Camera, 0)
+	cameras := make([]Camera, 0, len(values))
+	for _, value := range values {
+		cameras = append(cameras, fromDBCamera(value))
 	}
 
 	return cameras, nil
 }
 
-func (r *Repository) GetCameraByID(ctx context.Context, id int64) (Camera, error) {
-	camera, err := r.queries.GetCameraByID(ctx, id)
+func (r *Repository) GetCameraByID(
+	ctx context.Context,
+	userID int64,
+	cameraID int64,
+) (Camera, error) {
+	camera, err := r.queries.GetCameraByID(
+		ctx,
+		db.GetCameraByIDParams{
+			ID:     cameraID,
+			UserID: userID,
+		},
+	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Camera{}, ErrNotFound
@@ -64,14 +87,21 @@ func (r *Repository) GetCameraByID(ctx context.Context, id int64) (Camera, error
 		return Camera{}, fmt.Errorf("get camera by id: %w", err)
 	}
 
-	return camera, nil
+	return fromDBCamera(camera), nil
 }
 
-func (r *Repository) UpdateCamera(ctx context.Context, id int64, manufacturer string, model string) (Camera, error) {
+func (r *Repository) UpdateCamera(
+	ctx context.Context,
+	userID int64,
+	cameraID int64,
+	manufacturer string,
+	model string,
+) (Camera, error) {
 	camera, err := r.queries.UpdateCamera(
 		ctx,
 		db.UpdateCameraParams{
-			ID:           id,
+			ID:           cameraID,
+			UserID:       userID,
 			Manufacturer: manufacturer,
 			Model:        model,
 		},
@@ -84,11 +114,21 @@ func (r *Repository) UpdateCamera(ctx context.Context, id int64, manufacturer st
 		return Camera{}, fmt.Errorf("update camera: %w", err)
 	}
 
-	return camera, nil
+	return fromDBCamera(camera), nil
 }
 
-func (r *Repository) DeleteCamera(ctx context.Context, id int64) error {
-	rowsAffected, err := r.queries.DeleteCamera(ctx, id)
+func (r *Repository) DeleteCamera(
+	ctx context.Context,
+	userID int64,
+	cameraID int64,
+) error {
+	rowsAffected, err := r.queries.DeleteCamera(
+		ctx,
+		db.DeleteCameraParams{
+			ID:     cameraID,
+			UserID: userID,
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("delete camera: %w", err)
 	}

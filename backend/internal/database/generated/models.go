@@ -13,6 +13,7 @@ type Camera struct {
 	Manufacturer string             `json:"manufacturer"`
 	Model        string             `json:"model"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UserID       int64              `json:"user_id"`
 }
 
 type FilmColorType struct {
@@ -35,6 +36,7 @@ type FilmRoll struct {
 	ExposureIso int32              `json:"exposure_iso"`
 	Status      string             `json:"status"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UserID      int64              `json:"user_id"`
 }
 
 type FilmStock struct {
@@ -58,4 +60,14 @@ type Lense struct {
 	FocalLengthMm int32              `json:"focal_length_mm"`
 	MaxAperture   float64            `json:"max_aperture"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UserID        int64              `json:"user_id"`
+}
+
+type User struct {
+	ID          int64              `json:"id"`
+	Email       string             `json:"email"`
+	DisplayName string             `json:"display_name"`
+	AuthIssuer  string             `json:"auth_issuer"`
+	AuthSubject string             `json:"auth_subject"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 }

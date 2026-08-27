@@ -133,12 +133,14 @@ func fromListRow(value db.ListFilmRollsRow) FilmRoll {
 
 func (r *Repository) Create(
 	ctx context.Context,
+	userID int64,
 	filmStockID int64,
 	formatID int64,
 ) (FilmRoll, error) {
 	id, err := r.queries.CreateFilmRoll(
 		ctx,
 		db.CreateFilmRollParams{
+			UserID:      userID,
 			FilmStockID: filmStockID,
 			FormatID:    formatID,
 		},
@@ -147,14 +149,21 @@ func (r *Repository) Create(
 		return FilmRoll{}, fmt.Errorf("create film roll: %w", err)
 	}
 
-	return r.GetByID(ctx, id)
+	return r.GetByID(ctx, userID, id)
 }
 
 func (r *Repository) GetByID(
 	ctx context.Context,
-	id int64,
+	userID int64,
+	filmRollID int64,
 ) (FilmRoll, error) {
-	value, err := r.queries.GetFilmRollByID(ctx, id)
+	value, err := r.queries.GetFilmRollByID(
+		ctx,
+		db.GetFilmRollByIDParams{
+			ID:     filmRollID,
+			UserID: userID,
+		},
+	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return FilmRoll{}, ErrNotFound
@@ -171,8 +180,9 @@ func (r *Repository) GetByID(
 
 func (r *Repository) List(
 	ctx context.Context,
+	userID int64,
 ) ([]FilmRoll, error) {
-	values, err := r.queries.ListFilmRolls(ctx)
+	values, err := r.queries.ListFilmRolls(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("list film rolls: %w", err)
 	}
@@ -188,13 +198,15 @@ func (r *Repository) List(
 
 func (r *Repository) UpdateStatus(
 	ctx context.Context,
-	id int64,
+	userID int64,
+	filmRollID int64,
 	status FilmRollStatus,
 ) (FilmRoll, error) {
 	updatedID, err := r.queries.UpdateFilmRollStatus(
 		ctx,
 		db.UpdateFilmRollStatusParams{
-			ID:     id,
+			ID:     filmRollID,
+			UserID: userID,
 			Status: string(status),
 		},
 	)
@@ -209,18 +221,20 @@ func (r *Repository) UpdateStatus(
 		)
 	}
 
-	return r.GetByID(ctx, updatedID)
+	return r.GetByID(ctx, userID, updatedID)
 }
 
 func (r *Repository) UpdateExposureISO(
 	ctx context.Context,
-	id int64,
+	userID int64,
+	filmRollID int64,
 	exposureISO int32,
 ) (FilmRoll, error) {
 	updatedID, err := r.queries.UpdateFilmRollExposureISO(
 		ctx,
 		db.UpdateFilmRollExposureISOParams{
-			ID:          id,
+			ID:          filmRollID,
+			UserID:      userID,
 			ExposureIso: exposureISO,
 		},
 	)
@@ -235,12 +249,13 @@ func (r *Repository) UpdateExposureISO(
 		)
 	}
 
-	return r.GetByID(ctx, updatedID)
+	return r.GetByID(ctx, userID, updatedID)
 }
 
 func (r *Repository) UpdateCamera(
 	ctx context.Context,
-	id int64,
+	userID int64,
+	filmRollID int64,
 	cameraID *int64,
 ) (FilmRoll, error) {
 	var dbCameraID pgtype.Int8
@@ -255,7 +270,8 @@ func (r *Repository) UpdateCamera(
 	updatedID, err := r.queries.UpdateFilmRollCamera(
 		ctx,
 		db.UpdateFilmRollCameraParams{
-			ID:       id,
+			ID:       filmRollID,
+			UserID:   userID,
 			CameraID: dbCameraID,
 		},
 	)
@@ -270,14 +286,21 @@ func (r *Repository) UpdateCamera(
 		)
 	}
 
-	return r.GetByID(ctx, updatedID)
+	return r.GetByID(ctx, userID, updatedID)
 }
 
 func (r *Repository) Delete(
 	ctx context.Context,
-	id int64,
+	userID int64,
+	filmRollID int64,
 ) error {
-	rowsAffected, err := r.queries.DeleteFilmRoll(ctx, id)
+	rowsAffected, err := r.queries.DeleteFilmRoll(
+		ctx,
+		db.DeleteFilmRollParams{
+			ID:     filmRollID,
+			UserID: userID,
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("delete film roll: %w", err)
 	}

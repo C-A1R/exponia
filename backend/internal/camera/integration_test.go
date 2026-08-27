@@ -10,11 +10,43 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/C-A1R/exponia/backend/internal/identity"
 	"github.com/C-A1R/exponia/backend/internal/testutil"
+	"github.com/C-A1R/exponia/backend/internal/user"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+func createTestUser(
+	t *testing.T,
+	pool *pgxpool.Pool,
+	name string,
+) int64 {
+	t.Helper()
+
+	repository := user.NewRepository(pool)
+	created, err := repository.FindOrCreate(
+		t.Context(),
+		fmt.Sprintf("%s@example.com", name),
+		name,
+		"https://auth.example.com",
+		name,
+	)
+	if err != nil {
+		t.Fatalf("create test user: %v", err)
+	}
+
+	return created.ID
+}
+
+func requestAsUser(request *http.Request, userID int64) *http.Request {
+	return request.WithContext(
+		identity.WithUserID(request.Context(), userID),
+	)
+}
 
 func TestListCamerasEmpty(t *testing.T) {
 	pool := testutil.StartPostgres(t)
+	userID := createTestUser(t, pool, "camera-list-user")
 
 	logger := slog.New(
 		slog.NewTextHandler(io.Discard, nil),
@@ -35,7 +67,7 @@ func TestListCamerasEmpty(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 
-	mux.ServeHTTP(recorder, request)
+	mux.ServeHTTP(recorder, requestAsUser(request, userID))
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf(
@@ -55,6 +87,7 @@ func TestListCamerasEmpty(t *testing.T) {
 
 func TestCameraCRUD(t *testing.T) {
 	pool := testutil.StartPostgres(t)
+	userID := createTestUser(t, pool, "camera-crud-user")
 
 	logger := slog.New(
 		slog.NewTextHandler(io.Discard, nil),
@@ -82,13 +115,20 @@ func TestCameraCRUD(t *testing.T) {
 
 	createRecorder := httptest.NewRecorder()
 
-	mux.ServeHTTP(createRecorder, createRequest)
+	mux.ServeHTTP(createRecorder, requestAsUser(createRequest, userID))
 
 	if createRecorder.Code != http.StatusCreated {
 		t.Fatalf(
 			"create: expected status %d, got %d, body: %s",
 			http.StatusCreated,
 			createRecorder.Code,
+			createRecorder.Body.String(),
+		)
+	}
+
+	if strings.Contains(createRecorder.Body.String(), "\"user_id\"") {
+		t.Fatalf(
+			"create: response must not expose user_id: %s",
 			createRecorder.Body.String(),
 		)
 	}
@@ -128,7 +168,7 @@ func TestCameraCRUD(t *testing.T) {
 
 	getRecorder := httptest.NewRecorder()
 
-	mux.ServeHTTP(getRecorder, getRequest)
+	mux.ServeHTTP(getRecorder, requestAsUser(getRequest, userID))
 
 	if getRecorder.Code != http.StatusOK {
 		t.Fatalf(
@@ -168,7 +208,7 @@ func TestCameraCRUD(t *testing.T) {
 
 	updateRecorder := httptest.NewRecorder()
 
-	mux.ServeHTTP(updateRecorder, updateRequest)
+	mux.ServeHTTP(updateRecorder, requestAsUser(updateRequest, userID))
 
 	if updateRecorder.Code != http.StatusOK {
 		t.Fatalf(
@@ -202,7 +242,7 @@ func TestCameraCRUD(t *testing.T) {
 
 	deleteRecorder := httptest.NewRecorder()
 
-	mux.ServeHTTP(deleteRecorder, deleteRequest)
+	mux.ServeHTTP(deleteRecorder, requestAsUser(deleteRequest, userID))
 
 	if deleteRecorder.Code != http.StatusNoContent {
 		t.Fatalf(
@@ -222,7 +262,10 @@ func TestCameraCRUD(t *testing.T) {
 
 	getDeletedRecorder := httptest.NewRecorder()
 
-	mux.ServeHTTP(getDeletedRecorder, getDeletedRequest)
+	mux.ServeHTTP(
+		getDeletedRecorder,
+		requestAsUser(getDeletedRequest, userID),
+	)
 
 	if getDeletedRecorder.Code != http.StatusNotFound {
 		t.Fatalf(
@@ -230,6 +273,130 @@ func TestCameraCRUD(t *testing.T) {
 			http.StatusNotFound,
 			getDeletedRecorder.Code,
 			getDeletedRecorder.Body.String(),
+		)
+	}
+}
+
+func TestCameraOwnership(t *testing.T) {
+	pool := testutil.StartPostgres(t)
+	ownerID := createTestUser(t, pool, "camera-owner")
+	otherUserID := createTestUser(t, pool, "other-camera-user")
+
+	repository := NewRepository(pool)
+	created, err := repository.CreateCamera(
+		t.Context(),
+		ownerID,
+		"Nikon",
+		"FM2n",
+	)
+	if err != nil {
+		t.Fatalf("create owner camera: %v", err)
+	}
+
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	service := NewService(repository)
+	handler := NewHandler(service, logger)
+	mux := http.NewServeMux()
+	RegisterRoutes(mux, handler)
+
+	listRequest := httptest.NewRequest(
+		http.MethodGet,
+		"/api/v1/cameras",
+		nil,
+	)
+	listRecorder := httptest.NewRecorder()
+	mux.ServeHTTP(
+		listRecorder,
+		requestAsUser(listRequest, otherUserID),
+	)
+
+	if listRecorder.Code != http.StatusOK {
+		t.Fatalf(
+			"list: expected status %d, got %d",
+			http.StatusOK,
+			listRecorder.Code,
+		)
+	}
+
+	if listRecorder.Body.String() != "[]\n" {
+		t.Fatalf(
+			"list: expected other user to see no cameras, got %q",
+			listRecorder.Body.String(),
+		)
+	}
+
+	getRequest := httptest.NewRequest(
+		http.MethodGet,
+		fmt.Sprintf("/api/v1/cameras/%d", created.ID),
+		nil,
+	)
+	getRecorder := httptest.NewRecorder()
+	mux.ServeHTTP(getRecorder, requestAsUser(getRequest, otherUserID))
+
+	if getRecorder.Code != http.StatusNotFound {
+		t.Fatalf(
+			"get: expected status %d, got %d",
+			http.StatusNotFound,
+			getRecorder.Code,
+		)
+	}
+
+	updateRequest := httptest.NewRequest(
+		http.MethodPut,
+		fmt.Sprintf("/api/v1/cameras/%d", created.ID),
+		strings.NewReader(`{
+			"manufacturer": "Leica",
+			"model": "M6"
+		}`),
+	)
+	updateRequest.Header.Set("Content-Type", "application/json")
+	updateRecorder := httptest.NewRecorder()
+	mux.ServeHTTP(
+		updateRecorder,
+		requestAsUser(updateRequest, otherUserID),
+	)
+
+	if updateRecorder.Code != http.StatusNotFound {
+		t.Fatalf(
+			"update: expected status %d, got %d",
+			http.StatusNotFound,
+			updateRecorder.Code,
+		)
+	}
+
+	deleteRequest := httptest.NewRequest(
+		http.MethodDelete,
+		fmt.Sprintf("/api/v1/cameras/%d", created.ID),
+		nil,
+	)
+	deleteRecorder := httptest.NewRecorder()
+	mux.ServeHTTP(
+		deleteRecorder,
+		requestAsUser(deleteRequest, otherUserID),
+	)
+
+	if deleteRecorder.Code != http.StatusNotFound {
+		t.Fatalf(
+			"delete: expected status %d, got %d",
+			http.StatusNotFound,
+			deleteRecorder.Code,
+		)
+	}
+
+	ownerCamera, err := repository.GetCameraByID(
+		t.Context(),
+		ownerID,
+		created.ID,
+	)
+	if err != nil {
+		t.Fatalf("get owner camera after other user's requests: %v", err)
+	}
+
+	if ownerCamera.Manufacturer != "Nikon" || ownerCamera.Model != "FM2n" {
+		t.Fatalf(
+			"expected owner camera to remain unchanged, got %s %s",
+			ownerCamera.Manufacturer,
+			ownerCamera.Model,
 		)
 	}
 }

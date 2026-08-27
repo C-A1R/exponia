@@ -10,8 +10,11 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/C-A1R/exponia/backend/internal/camera"
 	"github.com/C-A1R/exponia/backend/internal/filmroll"
+	"github.com/C-A1R/exponia/backend/internal/identity"
 	"github.com/C-A1R/exponia/backend/internal/testutil"
+	"github.com/C-A1R/exponia/backend/internal/user"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -21,6 +24,17 @@ func setupFilmRollAPI(
 	t.Helper()
 
 	pool := testutil.StartPostgres(t)
+	userRepository := user.NewRepository(pool)
+	currentUser, err := userRepository.FindOrCreate(
+		t.Context(),
+		"film-roll-test@example.com",
+		"Film Roll Test",
+		"https://auth.example.com",
+		"film-roll-test-user",
+	)
+	if err != nil {
+		t.Fatalf("create test user: %v", err)
+	}
 
 	logger := slog.New(slog.NewTextHandler(
 		io.Discard,
@@ -33,8 +47,14 @@ func setupFilmRollAPI(
 
 	mux := http.NewServeMux()
 	filmroll.RegisterRoutes(mux, handler)
+	authenticatedHandler := http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			ctx := identity.WithUserID(r.Context(), currentUser.ID)
+			mux.ServeHTTP(w, r.WithContext(ctx))
+		},
+	)
 
-	return httptest.NewServer(mux), pool
+	return httptest.NewServer(authenticatedHandler), pool
 }
 
 func getTestFilmStockAndFormat(
@@ -448,5 +468,178 @@ func TestFilmRollNotFound(t *testing.T) {
 			"expected 404, got %d",
 			resp.StatusCode,
 		)
+	}
+}
+
+func TestFilmRollOwnership(t *testing.T) {
+	pool := testutil.StartPostgres(t)
+
+	userRepository := user.NewRepository(pool)
+	owner, err := userRepository.FindOrCreate(
+		t.Context(),
+		"film-roll-owner@example.com",
+		"Film Roll Owner",
+		"https://auth.example.com",
+		"film-roll-owner",
+	)
+	if err != nil {
+		t.Fatalf("create owner: %v", err)
+	}
+
+	otherUser, err := userRepository.FindOrCreate(
+		t.Context(),
+		"film-roll-other@example.com",
+		"Film Roll Other User",
+		"https://auth.example.com",
+		"film-roll-other-user",
+	)
+	if err != nil {
+		t.Fatalf("create other user: %v", err)
+	}
+
+	repository := filmroll.NewRepository(pool)
+	service := filmroll.NewService(repository)
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	handler := filmroll.NewHandler(service, logger)
+
+	mux := http.NewServeMux()
+	filmroll.RegisterRoutes(mux, handler)
+
+	filmStockID, formatID := getTestFilmStockAndFormat(t, pool)
+	ownersRoll, err := repository.Create(
+		t.Context(),
+		owner.ID,
+		filmStockID,
+		formatID,
+	)
+	if err != nil {
+		t.Fatalf("create owner's film roll: %v", err)
+	}
+
+	cameraRepository := camera.NewRepository(pool)
+	otherUsersCamera, err := cameraRepository.CreateCamera(
+		t.Context(),
+		otherUser.ID,
+		"Nikon",
+		"F3",
+	)
+	if err != nil {
+		t.Fatalf("create other user's camera: %v", err)
+	}
+
+	requestAsOtherUser := func(
+		method string,
+		path string,
+		body io.Reader,
+	) *httptest.ResponseRecorder {
+		t.Helper()
+
+		request := httptest.NewRequest(method, path, body)
+		request = request.WithContext(
+			identity.WithUserID(request.Context(), otherUser.ID),
+		)
+
+		recorder := httptest.NewRecorder()
+		mux.ServeHTTP(recorder, request)
+
+		return recorder
+	}
+
+	t.Run("cannot get another user's film roll", func(t *testing.T) {
+		response := requestAsOtherUser(
+			http.MethodGet,
+			"/api/v1/film-rolls/"+itoa(ownersRoll.ID),
+			nil,
+		)
+
+		if response.Code != http.StatusNotFound {
+			t.Fatalf("expected 404, got %d", response.Code)
+		}
+	})
+
+	t.Run("cannot list another user's film roll", func(t *testing.T) {
+		response := requestAsOtherUser(
+			http.MethodGet,
+			"/api/v1/film-rolls",
+			nil,
+		)
+
+		if response.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", response.Code)
+		}
+
+		var rolls []filmroll.FilmRoll
+		if err := json.NewDecoder(response.Body).Decode(&rolls); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+
+		if len(rolls) != 0 {
+			t.Fatalf("expected empty list, got %d film rolls", len(rolls))
+		}
+	})
+
+	t.Run("cannot update another user's film roll", func(t *testing.T) {
+		response := requestAsOtherUser(
+			http.MethodPatch,
+			"/api/v1/film-rolls/"+itoa(ownersRoll.ID)+"/status",
+			bytes.NewBufferString(`{"status":"ready"}`),
+		)
+
+		if response.Code != http.StatusNotFound {
+			t.Fatalf("expected 404, got %d", response.Code)
+		}
+	})
+
+	t.Run("cannot delete another user's film roll", func(t *testing.T) {
+		response := requestAsOtherUser(
+			http.MethodDelete,
+			"/api/v1/film-rolls/"+itoa(ownersRoll.ID),
+			nil,
+		)
+
+		if response.Code != http.StatusNotFound {
+			t.Fatalf("expected 404, got %d", response.Code)
+		}
+	})
+
+	t.Run("cannot assign another user's camera", func(t *testing.T) {
+		request := httptest.NewRequest(
+			http.MethodPatch,
+			"/api/v1/film-rolls/"+itoa(ownersRoll.ID)+"/camera",
+			bytes.NewBufferString(
+				`{"camera_id":`+itoa(otherUsersCamera.ID)+`}`,
+			),
+		)
+		request = request.WithContext(
+			identity.WithUserID(request.Context(), owner.ID),
+		)
+
+		response := httptest.NewRecorder()
+		mux.ServeHTTP(response, request)
+
+		if response.Code != http.StatusNotFound {
+			t.Fatalf("expected 404, got %d", response.Code)
+		}
+	})
+
+	unchangedRoll, err := repository.GetByID(
+		t.Context(),
+		owner.ID,
+		ownersRoll.ID,
+	)
+	if err != nil {
+		t.Fatalf("owner must still access film roll: %v", err)
+	}
+
+	if unchangedRoll.Status != filmroll.FilmRollStatusUnused {
+		t.Fatalf(
+			"expected status %q, got %q",
+			filmroll.FilmRollStatusUnused,
+			unchangedRoll.Status,
+		)
+	}
+
+	if unchangedRoll.Camera != nil {
+		t.Fatalf("expected camera to remain nil, got %+v", unchangedRoll.Camera)
 	}
 }

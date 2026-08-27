@@ -32,6 +32,11 @@ func NewHandler(
 }
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httpapi.RequireUser(h.logger, w, r)
+	if !ok {
+		return
+	}
+
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 
 	var request createCameraRequest
@@ -59,6 +64,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	camera, err := h.service.CreateCamera(
 		r.Context(),
+		userID,
 		request.Manufacturer,
 		request.Model,
 	)
@@ -81,7 +87,12 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
-	cameras, err := h.service.ListCameras(r.Context())
+	userID, ok := httpapi.RequireUser(h.logger, w, r)
+	if !ok {
+		return
+	}
+
+	cameras, err := h.service.ListCameras(r.Context(), userID)
 	if err != nil {
 		h.logger.Error("failed to list cameras", slog.Any("error", err))
 		httpapi.WriteError(h.logger, w, http.StatusInternalServerError, "internal server error")
@@ -97,6 +108,11 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httpapi.RequireUser(h.logger, w, r)
+	if !ok {
+		return
+	}
+
 	idValue := r.PathValue("id")
 	id, err := strconv.ParseInt(idValue, 10, 64)
 	if err != nil || id <= 0 {
@@ -109,7 +125,7 @@ func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	camera, err := h.service.GetCameraByID(r.Context(), id)
+	camera, err := h.service.GetCameraByID(r.Context(), userID, id)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			httpapi.WriteError(
@@ -147,6 +163,11 @@ type updateCameraRequest struct {
 }
 
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httpapi.RequireUser(h.logger, w, r)
+	if !ok {
+		return
+	}
+
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 
 	idValue := r.PathValue("id")
@@ -195,6 +216,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 
 	camera, err := h.service.UpdateCamera(
 		r.Context(),
+		userID,
 		id,
 		request.Manufacturer,
 		request.Model,
@@ -234,6 +256,11 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httpapi.RequireUser(h.logger, w, r)
+	if !ok {
+		return
+	}
+
 	idValue := r.PathValue("id")
 	id, err := strconv.ParseInt(idValue, 10, 64)
 	if err != nil || id <= 0 {
@@ -246,7 +273,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.service.DeleteCamera(r.Context(), id)
+	err = h.service.DeleteCamera(r.Context(), userID, id)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			httpapi.WriteError(

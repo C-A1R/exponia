@@ -11,16 +11,31 @@ import (
 
 const createLens = `-- name: CreateLens :one
 INSERT INTO lenses (
+    user_id,
     manufacturer,
     model,
     focal_length_mm,
     max_aperture
 )
-VALUES ($1, $2, $3, $4)
-RETURNING id, manufacturer, model, focal_length_mm, max_aperture, created_at
+VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5
+)
+RETURNING
+    id,
+    manufacturer,
+    model,
+    focal_length_mm,
+    max_aperture,
+    created_at,
+    user_id
 `
 
 type CreateLensParams struct {
+	UserID        int64   `json:"user_id"`
 	Manufacturer  string  `json:"manufacturer"`
 	Model         string  `json:"model"`
 	FocalLengthMm int32   `json:"focal_length_mm"`
@@ -29,6 +44,7 @@ type CreateLensParams struct {
 
 func (q *Queries) CreateLens(ctx context.Context, arg CreateLensParams) (Lense, error) {
 	row := q.db.QueryRow(ctx, createLens,
+		arg.UserID,
 		arg.Manufacturer,
 		arg.Model,
 		arg.FocalLengthMm,
@@ -42,6 +58,7 @@ func (q *Queries) CreateLens(ctx context.Context, arg CreateLensParams) (Lense, 
 		&i.FocalLengthMm,
 		&i.MaxAperture,
 		&i.CreatedAt,
+		&i.UserID,
 	)
 	return i, err
 }
@@ -49,10 +66,16 @@ func (q *Queries) CreateLens(ctx context.Context, arg CreateLensParams) (Lense, 
 const deleteLens = `-- name: DeleteLens :execrows
 DELETE FROM lenses
 WHERE id = $1
+  AND user_id = $2
 `
 
-func (q *Queries) DeleteLens(ctx context.Context, id int64) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteLens, id)
+type DeleteLensParams struct {
+	ID     int64 `json:"id"`
+	UserID int64 `json:"user_id"`
+}
+
+func (q *Queries) DeleteLens(ctx context.Context, arg DeleteLensParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteLens, arg.ID, arg.UserID)
 	if err != nil {
 		return 0, err
 	}
@@ -60,13 +83,26 @@ func (q *Queries) DeleteLens(ctx context.Context, id int64) (int64, error) {
 }
 
 const getLensByID = `-- name: GetLensByID :one
-SELECT id, manufacturer, model, focal_length_mm, max_aperture, created_at
+SELECT
+    id,
+    manufacturer,
+    model,
+    focal_length_mm,
+    max_aperture,
+    created_at,
+    user_id
 FROM lenses
 WHERE id = $1
+  AND user_id = $2
 `
 
-func (q *Queries) GetLensByID(ctx context.Context, id int64) (Lense, error) {
-	row := q.db.QueryRow(ctx, getLensByID, id)
+type GetLensByIDParams struct {
+	ID     int64 `json:"id"`
+	UserID int64 `json:"user_id"`
+}
+
+func (q *Queries) GetLensByID(ctx context.Context, arg GetLensByIDParams) (Lense, error) {
+	row := q.db.QueryRow(ctx, getLensByID, arg.ID, arg.UserID)
 	var i Lense
 	err := row.Scan(
 		&i.ID,
@@ -75,18 +111,27 @@ func (q *Queries) GetLensByID(ctx context.Context, id int64) (Lense, error) {
 		&i.FocalLengthMm,
 		&i.MaxAperture,
 		&i.CreatedAt,
+		&i.UserID,
 	)
 	return i, err
 }
 
 const listLenses = `-- name: ListLenses :many
-SELECT id, manufacturer, model, focal_length_mm, max_aperture, created_at
+SELECT
+    id,
+    manufacturer,
+    model,
+    focal_length_mm,
+    max_aperture,
+    created_at,
+    user_id
 FROM lenses
+WHERE user_id = $1
 ORDER BY created_at DESC
 `
 
-func (q *Queries) ListLenses(ctx context.Context) ([]Lense, error) {
-	rows, err := q.db.Query(ctx, listLenses)
+func (q *Queries) ListLenses(ctx context.Context, userID int64) ([]Lense, error) {
+	rows, err := q.db.Query(ctx, listLenses, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -101,6 +146,7 @@ func (q *Queries) ListLenses(ctx context.Context) ([]Lense, error) {
 			&i.FocalLengthMm,
 			&i.MaxAperture,
 			&i.CreatedAt,
+			&i.UserID,
 		); err != nil {
 			return nil, err
 		}
@@ -115,29 +161,39 @@ func (q *Queries) ListLenses(ctx context.Context) ([]Lense, error) {
 const updateLens = `-- name: UpdateLens :one
 UPDATE lenses
 SET
-    manufacturer = $2,
-    model = $3,
-    focal_length_mm = $4,
-    max_aperture = $5
-WHERE id = $1
-RETURNING id, manufacturer, model, focal_length_mm, max_aperture, created_at
+    manufacturer = $1,
+    model = $2,
+    focal_length_mm = $3,
+    max_aperture = $4
+WHERE id = $5
+  AND user_id = $6
+RETURNING
+    id,
+    manufacturer,
+    model,
+    focal_length_mm,
+    max_aperture,
+    created_at,
+    user_id
 `
 
 type UpdateLensParams struct {
-	ID            int64   `json:"id"`
 	Manufacturer  string  `json:"manufacturer"`
 	Model         string  `json:"model"`
 	FocalLengthMm int32   `json:"focal_length_mm"`
 	MaxAperture   float64 `json:"max_aperture"`
+	ID            int64   `json:"id"`
+	UserID        int64   `json:"user_id"`
 }
 
 func (q *Queries) UpdateLens(ctx context.Context, arg UpdateLensParams) (Lense, error) {
 	row := q.db.QueryRow(ctx, updateLens,
-		arg.ID,
 		arg.Manufacturer,
 		arg.Model,
 		arg.FocalLengthMm,
 		arg.MaxAperture,
+		arg.ID,
+		arg.UserID,
 	)
 	var i Lense
 	err := row.Scan(
@@ -147,6 +203,7 @@ func (q *Queries) UpdateLens(ctx context.Context, arg UpdateLensParams) (Lense, 
 		&i.FocalLengthMm,
 		&i.MaxAperture,
 		&i.CreatedAt,
+		&i.UserID,
 	)
 	return i, err
 }

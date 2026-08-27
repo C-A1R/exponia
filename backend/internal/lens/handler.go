@@ -38,6 +38,11 @@ type updateLensRequest struct {
 }
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httpapi.RequireUser(h.logger, w, r)
+	if !ok {
+		return
+	}
+
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 
 	var request createLensRequest
@@ -75,6 +80,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	lens, err := h.service.Create(
 		r.Context(),
+		userID,
 		request.Manufacturer,
 		request.Model,
 		request.FocalLengthMm,
@@ -92,7 +98,12 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
-	lenses, err := h.service.List(r.Context())
+	userID, ok := httpapi.RequireUser(h.logger, w, r)
+	if !ok {
+		return
+	}
+
+	lenses, err := h.service.List(r.Context(), userID)
 	if err != nil {
 		h.logger.Error("failed to list lenses", slog.Any("error", err))
 		httpapi.WriteError(h.logger, w, http.StatusInternalServerError, "internal server error")
@@ -103,6 +114,11 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httpapi.RequireUser(h.logger, w, r)
+	if !ok {
+		return
+	}
+
 	idValue := r.PathValue("id")
 
 	id, err := strconv.ParseInt(idValue, 10, 64)
@@ -111,7 +127,7 @@ func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	lens, err := h.service.GetByID(r.Context(), id)
+	lens, err := h.service.GetByID(r.Context(), userID, id)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			httpapi.WriteError(h.logger, w, http.StatusNotFound, "lens not found")
@@ -127,6 +143,11 @@ func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httpapi.RequireUser(h.logger, w, r)
+	if !ok {
+		return
+	}
+
 	idValue := r.PathValue("id")
 
 	id, err := strconv.ParseInt(idValue, 10, 64)
@@ -172,6 +193,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 
 	lens, err := h.service.Update(
 		r.Context(),
+		userID,
 		id,
 		request.Manufacturer,
 		request.Model,
@@ -195,6 +217,11 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httpapi.RequireUser(h.logger, w, r)
+	if !ok {
+		return
+	}
+
 	idValue := r.PathValue("id")
 
 	id, err := strconv.ParseInt(idValue, 10, 64)
@@ -203,7 +230,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.service.Delete(r.Context(), id); err != nil {
+	if err := h.service.Delete(r.Context(), userID, id); err != nil {
 		if errors.Is(err, ErrNotFound) {
 			httpapi.WriteError(h.logger, w, http.StatusNotFound, "lens not found")
 			return
