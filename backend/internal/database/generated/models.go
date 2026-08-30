@@ -53,6 +53,15 @@ type FilmStockFormat struct {
 	FormatID    int64 `json:"format_id"`
 }
 
+type Frame struct {
+	ID         int64              `json:"id"`
+	FilmRollID int64              `json:"film_roll_id"`
+	FrameIndex int32              `json:"frame_index"`
+	FrameLabel pgtype.Text        `json:"frame_label"`
+	Note       pgtype.Text        `json:"note"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
 type Lense struct {
 	ID            int64              `json:"id"`
 	Manufacturer  string             `json:"manufacturer"`

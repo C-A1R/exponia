@@ -19,6 +19,7 @@ import (
 	"github.com/C-A1R/exponia/backend/internal/camera"
 	"github.com/C-A1R/exponia/backend/internal/filmroll"
 	"github.com/C-A1R/exponia/backend/internal/filmstock"
+	"github.com/C-A1R/exponia/backend/internal/frame"
 	"github.com/C-A1R/exponia/backend/internal/lens"
 )
 
@@ -75,6 +76,11 @@ func main() {
 	filmRollService := filmroll.NewService(filmRollRepository)
 	filmRollHandler := filmroll.NewHandler(filmRollService, appLogger)
 	filmroll.RegisterRoutes(apiMux, filmRollHandler)
+
+	frameRepository := frame.NewRepository(db)
+	frameService := frame.NewService(frameRepository)
+	frameHandler := frame.NewHandler(frameService, appLogger)
+	frame.RegisterRoutes(apiMux, frameHandler)
 
 	userRepository := user.NewRepository(db)
 	userService := user.NewService(userRepository)
