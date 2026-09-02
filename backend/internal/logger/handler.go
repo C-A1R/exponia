@@ -79,6 +79,8 @@ func appendAttr(line *strings.Builder, attr slog.Attr) {
 	attr.Value = attr.Value.Resolve()
 
 	line.WriteByte(' ')
+	line.WriteString(attr.Key)
+	line.WriteByte(':')
 
 	switch attr.Value.Kind() {
 	case slog.KindString:

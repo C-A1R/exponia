@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/C-A1R/exponia/backend/internal/buildinfo"
 	"github.com/C-A1R/exponia/backend/internal/database"
 	"github.com/C-A1R/exponia/backend/internal/httpapi"
 	"github.com/C-A1R/exponia/backend/internal/logger"
@@ -25,7 +26,8 @@ import (
 )
 
 type healthResponse struct {
-	Status string `json:"status"`
+	Status    string         `json:"status"`
+	BuildInfo buildinfo.Info `json:"build"`
 }
 
 func main() {
@@ -33,6 +35,16 @@ func main() {
 		logger.NewHandler(os.Stdout, slog.LevelInfo),
 	)
 	slog.SetDefault(appLogger)
+
+	currentBuild := buildinfo.Current()
+	if err := logger.WriteStartupBanner(
+		os.Stdout,
+		currentBuild.Version,
+		currentBuild.Commit,
+		currentBuild.BuildTime,
+	); err != nil {
+		appLogger.Error("failed to write startup banner", slog.Any("error", err))
+	}
 
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL == "" {
@@ -155,7 +167,8 @@ func healthHandler(logger *slog.Logger) http.HandlerFunc {
 			w,
 			http.StatusOK,
 			healthResponse{
-				Status: "ok",
+				Status:    "ok",
+				BuildInfo: buildinfo.Current(),
 			},
 		)
 	}
