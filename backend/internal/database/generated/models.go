@@ -16,6 +16,19 @@ type Camera struct {
 	UserID       int64              `json:"user_id"`
 }
 
+type Exposure struct {
+	ID             int64              `json:"id"`
+	FrameID        int64              `json:"frame_id"`
+	ExposureIndex  int32              `json:"exposure_index"`
+	CameraID       int64              `json:"camera_id"`
+	LensID         pgtype.Int8        `json:"lens_id"`
+	Aperture       pgtype.Float8      `json:"aperture"`
+	ShutterSpeedUs pgtype.Int8        `json:"shutter_speed_us"`
+	ShotAt         pgtype.Timestamptz `json:"shot_at"`
+	Note           pgtype.Text        `json:"note"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
 type FilmColorType struct {
 	ID   int64  `json:"id"`
 	Code string `json:"code"`
